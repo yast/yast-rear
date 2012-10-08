@@ -1,0 +1,13 @@
+{
+
+// testedfiles: Rear.ycp
+
+include "testsuite.ycp";
+TESTSUITE_INIT([], nil);
+
+import "Rear";
+
+DUMP("Rear::Modified");
+TEST(``(Rear::Modified()), [], nil);
+
+}
