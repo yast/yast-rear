@@ -1,23 +1,24 @@
 [Desktop Entry]
 Type=Application
-Categories=Settings;System;Qt;X-SuSE-YaST;X-SuSE-YaST-Misc;
+Categories=Settings;System;Qt;X-SuSE-YaST;X-SuSE-YaST-Hardware;
 
 X-KDE-ModuleType=Library
 X-KDE-HasReadOnlyMode=true
 X-KDE-Library=yast2
 X-SuSE-YaST-Call=rear
 
-X-SuSE-YaST-Group=Misc
+X-SuSE-YaST-Group=Hardware
 X-SuSE-YaST-Argument=
 X-SuSE-YaST-RootOnly=true
 X-SuSE-YaST-AutoInst=
 X-SuSE-YaST-Geometry=
 X-SuSE-YaST-SortKey=
 X-SuSE-YaST-AutoInstResource=rear
+X-SuSE-YaST-Keywords=rear,backup
 
-Icon=yast-rear
-Exec=/usr/bin/xdg-su -c '/sbin/yast2 rear'
+Icon=yast-backup
+Exec=xdg-su -c "/sbin/yast2 rear"
 
-Name=Rear
-GenericName=rear
+Name=Rear Backup
+GenericName=Configure Rear Backup
 StartupNotify=true

@@ -1,0 +1,334 @@
+/* ------------------------------------------------------------------------------
+ * Copyright (c) 2006-2012 Novell, Inc. All Rights Reserved.
+ *
+ *
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of version 2 of the GNU General Public License as published by the
+ * Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, contact Novell, Inc.
+ *
+ * To contact Novell about this file by physical or electronic mail, you may find
+ * current contact information at www.novell.com.
+ * ------------------------------------------------------------------------------
+ */
+
+/**
+ * File:	include/rear/ui.ycp
+ * Package:	Configuration of rear
+ * Summary:	Dialogs definitions
+ * Authors:	Thomas Goettlicher <tgoettlicher@suse.de>
+ *
+ * $Id$
+ */
+
+{
+
+textdomain "rear";
+
+import "Rear";
+import "Label";
+import "Message";
+import "Package";
+import "Popup";
+import "Service";
+import "Wizard";
+
+
+/**
+ * Popup for running rear
+ */
+define boolean RunRear () {
+
+//    boolean modified	= port != Rear::port || baud_rate != Rear::max_baud_rate;
+boolean modified=false;
+    // if service was originaly started
+    boolean orig_start	= false;
+
+    /**
+     * temporary start the service
+     * return error output
+     */
+    define string run_rear_start () {
+
+	map out = $[];
+	orig_start =  (Service::Status ("irda") == 0);
+
+	if (modified)
+	{
+	    // 1. save new configuration
+//	    SCR::Write (.sysconfig.irda.IRDA_PORT, port);
+//	    SCR::Write (.sysconfig.irda.IRDA_MAX_BAUD_RATE, baud_rate);
+	    SCR::Write (.sysconfig.irda, nil);
+	}
+
+        // 2. start/restart the service
+	// when module cannot be loaded, Runlevel returns 0 -> use target.bash
+        out = Service::RunInitScriptOutput ("rear", "mkbackup");
+
+	return out["stderr"]:"";
+    }
+
+    UI::OpenDialog(`opt(`decorated), `HBox(`HSpacing(1.5),
+    `VBox(
+        `VSpacing(1),
+        // Wait text label
+        `Label(_("Initializing -- please wait...")),
+        `VSpacing(1),
+        `PushButton(`id(`done), `opt(`default), Label::CancelButton()),
+        `VSpacing(1)),
+    `HSpacing(1.5)
+    ));
+
+    string start = run_rear_start ();
+    UI::CloseDialog();
+    if (start != "")
+    {
+	y2error ("rear returns: %1", start);
+	Popup::Error (Message::CannotStartService ("rear"));
+	return false;
+    }
+
+    // run test application
+    SCR::Execute (.background.run_output, "irdadump");
+
+    // construct the dialog
+    UI::OpenDialog(`opt(`decorated), `HBox(`HSpacing(1.5),
+    `VSpacing(18),
+    `VBox(
+        `HSpacing(80),
+        `VSpacing(0.5),
+	// Popup label (heading)
+        `Label(_("Rear output:")),
+        `VSpacing(0.5),
+        `LogView (`id (`log), "", 8, 0),
+        `VSpacing(0.5),
+	`HBox (
+	    `PushButton (`id(`done), `opt(`key_F9), Label::CloseButton ()),
+	    `PushButton (`id(`stop), `opt(`key_F5), Label::StopButton ()),
+	    `PushButton (`id(`cont), `opt(`key_F6), Label::ContinueButton ())
+	),
+        `VSpacing(0.5)),
+    `HSpacing(1.5)
+    ));
+
+    // read the output of test application
+    string test_output	= "";
+    string discovery	= "";
+    UI::ChangeWidget (`id (`cont), `Enabled, false);
+
+    symbol ret = nil;
+    do
+    {
+	ret = (symbol) UI::PollInput();
+        if ((boolean) SCR::Read(.background.output_open) &&
+	    (integer) SCR::Read(.background.newlines)>0)
+        {
+            // read the output line from irw:
+	    list out	= (list)SCR::Read(.background.newout);
+	    test_output = out[0]:"";
+	    if (test_output != "")
+		UI::ChangeWidget (`id(`log), `LastLine, test_output + "\n");
+        }
+	else if (!(boolean)SCR::Read(.background.output_open))
+	{
+	    // error text
+	    Popup::Error(_("The testing application is not responding."));
+	    ret = `ok;
+	}
+	string disc = (string)
+	    SCR::Read (.target.string, "/proc/net/irda/discovery");
+	if (disc != discovery)
+	{
+	    discovery	= disc;
+	    UI::ChangeWidget (`id(`discovery), `Value, discovery);
+	}
+	if (ret == `stop)
+	{
+	    SCR::Execute(.background.kill);
+	    UI::ChangeWidget (`id (`cont), `Enabled, true);
+	    UI::ChangeWidget (`id (`stop), `Enabled, false);
+	    ret = (symbol) UI::UserInput ();
+	}
+	if (ret == `cont)
+	{
+	    SCR::Execute (.background.run_output, "irdadump");
+	    UI::ChangeWidget (`id (`stop), `Enabled, true);
+	    UI::ChangeWidget (`id (`cont), `Enabled, false);
+	    ret = nil;
+	}
+	sleep (100);
+    }
+    while (ret == nil);
+
+    SCR::Execute(.background.kill);
+    UI::CloseDialog();
+
+    return true;
+}
+
+
+/**
+ * Dialog for seting up IrDA
+ */
+define symbol RearDialog () {
+
+    // For translators: Caption of the dialog
+    string caption = _("Rear Configuration");
+
+    // help text for IrDA 1/4
+    string help = _("<p>Here, configure Rear Relax and Recover backup for your computer.</p>") +
+
+    // help text for IrDA 2/4
+    _("<p>.</p>");
+
+
+    string port		= Rear::port;
+    string output	= Rear::output;
+    string baud_rate	= Rear::max_baud_rate;
+    boolean brate_limited	= (baud_rate != "0");
+
+    list ports	= [ "/dev/ttyS0", "/dev/ttyS1", "/dev/ttyS2", "/dev/ttyS3", output ];
+    list rates	= [ "9600", "19200", "38400", "57600", "115200" ];
+
+    list boot_media = ["USB", "CD Iso Image" ];
+    list rescue_location = ["/dev/sdb", "/dev/sdc", "/dev/sdd"];
+    list backup_location = ["nfs://host/dir"];
+    list backup_type = ["NFS", "USB"];
+    boolean keep_old_backup = true;
+
+    list<term> expertMenu = [ `item(`id(`additionalDirs), "Additional Directories in Backup" ) , 
+                              `item(`id(`additionalModules), "Additional Kernel Modules in Rescue System" ) ];
+
+    term con = `HBox (`HSpacing (3), `VBox (
+        `VSpacing (),
+	// frame label
+	`Frame (_("Recovery System"), `HBox (`HSpacing (),
+	    `VBox (
+		`VSpacing (0.5),
+		`ComboBox (`id(`boot_media), `opt(`notify, `hstretch), _("&Boot Media"), boot_media),
+		`VSpacing (0.5),
+		`ComboBox (`id(`rescue_location), `opt(`notify, `hstretch, `editable), _("&Location"), rescue_location),
+		`VSpacing (0.5)
+	    ), `HSpacing ()
+	)),
+	`VSpacing (1.5),
+	// frame label
+	`Frame (_("Backup"), `HBox (`HSpacing (),
+	    `VBox (
+		`VSpacing (0.5),
+		`ComboBox (`id(`backup_type), `opt(`notify, `hstretch), _("&Backup Media"), backup_type),
+		`VSpacing (0.5),
+		`ComboBox (`id(`backup_location), `opt(`notify, `hstretch, `editable), _("&Location"), backup_location),
+		`VSpacing (0.5),
+		`CheckBox (`id(`keep_old_backup), `opt(`notify), _("&Keep old backup"), keep_old_backup),
+		`VSpacing (0.5)
+	    ), `HSpacing ()
+	)),
+	`VSpacing (0.5),
+        `Right( `MenuButton( _("Advanced"), expertMenu )),
+	`VStretch ()
+    ), `HSpacing(3));
+
+
+    Wizard::SetContents (caption, con, help, true, true);
+
+    UI::ChangeWidget (`id(`ports), `Value, port);
+
+//    foreach (symbol widget, [`ports, `test, `limited],{
+//	UI::ChangeWidget (`id (widget), `Enabled, start);
+//    });
+
+//    UI::ChangeWidget (`id (`brate), `Enabled, start && brate_limited);
+    if (brate_limited && contains (rates, baud_rate))
+    {
+	UI::ChangeWidget (`id(`brate), `Value, baud_rate);
+    }
+
+    symbol ret = nil;
+    do
+    {
+	ret		= (symbol) UI::UserInput ();
+	port		= (string) UI::QueryWidget (`id(`ports), `Value);
+
+	if (brate_limited)
+	{
+	    baud_rate	= (string) UI::QueryWidget (`id(`brate), `Value);
+	}
+/*        if (ret == `yes || ret == `no)
+	{
+            start = (ret == `yes);
+	    if (start && !Package::InstalledAll (["irda"]))
+	    {
+		if (Package::InstallAll (["irda"]))
+		{
+		    Rear::ReadSysconfig ();
+		    port = Rear::port;
+		    UI::ChangeWidget (`id(`ports), `Value, port);
+		}
+		else
+		{
+		    start = false;
+		    UI::ChangeWidget (`id(`rd), `CurrentButton, `no);
+		}
+	    }
+	    foreach (symbol widget, [`ports, `test, `limited], {
+		UI::ChangeWidget (`id (widget), `Enabled, start);
+	    });
+	    UI::ChangeWidget (`id (`brate), `Enabled, start && brate_limited);
+	}
+	if (ret == `limited)
+	{
+	    brate_limited = (boolean) UI::QueryWidget (`id(`limited), `Value);
+	    UI::ChangeWidget (`id (`brate), `Enabled, start && brate_limited);
+	    if (!brate_limited)
+		baud_rate	= "0"; 
+
+	}
+*/
+	if (ret == `test)
+	{
+	    RunRear ();
+	}
+
+    } while (!contains ([`back, `abort, `cancel, `next, `ok], ret));
+
+    if ((ret == `next || ret == `ok) //&&
+//	(start != Rear::start || port != Rear::port ||
+|| 	baud_rate != Rear::max_baud_rate)
+    {
+	Rear::modified		= true;
+//	Rear::start		= start;
+	Rear::port		= port;
+	Rear::max_baud_rate	= baud_rate;
+    }
+    return ret;
+}
+
+/**
+ * Thew whole sequence
+ */
+define symbol RearSequence () {
+
+    Wizard::OpenOKDialog ();
+    Wizard::SetDesktopTitleAndIcon("rear");
+
+    Rear::Read ();
+
+    symbol ret = RearDialog ();
+    if (ret == `next || ret == `finish || ret == `ok)
+    {
+	Rear::Write ();
+    }
+
+    UI::CloseDialog ();
+    return ret;
+}
+
+/* EOF */
+}
