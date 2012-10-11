@@ -60,7 +60,7 @@ define boolean RearChangeConfiguration (map options ) {
     string port = options["port"]:"";
     if (port != "")
     {
-	Rear::port	= port;
+//	Rear::port	= port;
 	Rear::modified	= true;
 	return true;
     }

@@ -18,7 +18,7 @@
  * ------------------------------------------------------------------------------
  */
 
-/**
+ /**
  * File:	modules/Rear.ycp
  * Package:	Configuration of rear
  * Summary:	Rear settings, input and output functions
@@ -36,25 +36,61 @@ module "Rear";
 textdomain "rear";
 
 import "FileUtils";
-import "Progress";
+import "Storage";
 
-/**
- * Data was modified?
- */
+// Data was modified?
 global boolean modified = false;
 
+global string backup = "";
+global string output = "";
+global string netfs_url = "";
+global boolean netfs_keep_old_backup = true;
+global list<string> modules_load = [];
+global list<string> backup_prog_include = [];
+global list<string> usbdevices = [];
 
-/**
- * serial port used for rear
- */
-global string port	= "";
 
-global string output	= "";
+define list<string> GetUsbDevices ()
+{
+    list<string> usbdevs = [];
 
-/**
- * Maximum baud rate for the IrDA serial port
- */
-global string max_baud_rate	= "0";
+    map<string, map> storage = Storage::GetTargetMap();
+
+    foreach (string device, map devicemap, storage , {
+         y2error("device = %1", device); 
+         if ( devicemap["transport"]:`none == `usb ) 
+         {
+                y2error("device %1 is a usb device", device);
+                usbdevs = add(usbdevs, device);
+         }
+
+    });
+    return usbdevs;
+}
+
+
+
+
+define list<string> RearListToYCPList ( string rearlist ) {
+
+    list<string> ycplist = [];
+
+    if (rearlist == nil)
+        return [];
+
+    ycplist = splitstring (rearlist, " ");
+    if ( ycplist[0]:"" == "(" ) ycplist = remove(ycplist,0);
+    if (ycplist[size(ycplist)-1]:"" == ")") ycplist = remove(ycplist,size(ycplist)-1);
+
+    return ycplist;
+
+}
+
+define string YCPListToRearList ( list<string> ycplist ) {
+    return "(" + mergestring (ycplist, " " ) + ")";
+}
+
+
 
 /**
  * Read rear settings from /etc/rear/local.conf
@@ -62,20 +98,35 @@ global string max_baud_rate	= "0";
  */
 global define boolean ReadSysconfig () {
 
+    usbdevices = GetUsbDevices();
 
     if (FileUtils::Exists ("/etc/rear/local.conf"))
     {
-	port = (string) SCR::Read (.sysconfig.rear.IRDA_PORT);
-	if (port == nil)
-	    port = "";
+	backup = (string) SCR::Read (.sysconfig.rear.BACKUP);
+	if (backup == nil)
+	    backup = "";
 
 	output = (string) SCR::Read (.sysconfig.rear.OUTPUT);
 	if (output == nil)
 	    output = "";
 
-	max_baud_rate = (string) SCR::Read (.sysconfig.rear.IRDA_MAX_BAUD_RATE);
-	if (max_baud_rate == nil)
-	    max_baud_rate = "0";
+	netfs_url = (string) SCR::Read (.sysconfig.rear.NETFS_URL);
+	if (netfs_url == nil)
+	    netfs_url = "";
+
+	string netfs_keep_old_backup_tmp = (string) SCR::Read (.sysconfig.rear.NETFS_KEEP_OLD_BACKUP);
+	if ( netfs_keep_old_backup_tmp == "no" || netfs_keep_old_backup_tmp == "n"  )
+	    netfs_keep_old_backup = false;
+        else
+	    netfs_keep_old_backup = true;
+
+
+	string modules_load_tmp = (string) SCR::Read (.sysconfig.rear.MODULES_LOAD);
+        modules_load = RearListToYCPList( modules_load_tmp);
+
+	string backup_prog_include_tmp = (string) SCR::Read (.sysconfig.rear.BACKUP_PROG_INCLUDE);
+        backup_prog_include = RearListToYCPList( backup_prog_include_tmp);
+
 	return true;
     }
     return false;
@@ -101,19 +152,27 @@ global define boolean Write () {
     if (!modified)
 	return true;
 
-    /* Rear read dialog caption */
-    string caption	= _("Saving Rear Configuration");
-    integer steps	= 2;
+    if (backup != "")
+	SCR::Write (.sysconfig.rear.BACKUP, backup);
 
+    if (output != "")
+	SCR::Write (.sysconfig.rear.OUTPUT, output);
 
-    if (port != "")
-    {
-	SCR::Write (.sysconfig.rear.IRDA_PORT, port);
-    }
-    if (max_baud_rate != nil)
-    {
-	SCR::Write (.sysconfig.rear.IRDA_MAX_BAUD_RATE, max_baud_rate);
-    }
+    if (netfs_url != "")
+	SCR::Write (.sysconfig.rear.NETFS_URL, netfs_url);
+
+    if (netfs_keep_old_backup != nil)
+        if ( netfs_keep_old_backup )
+	    SCR::Write (.sysconfig.rear.NETFS_KEEP_OLD_BACKUP, "yes" );
+        else
+	    SCR::Write (.sysconfig.rear.NETFS_KEEP_OLD_BACKUP, "no" );
+
+    if (modules_load != [])
+	SCR::Write (.sysconfig.rear.MODULES_LOAD, YCPListToRearList(modules_load));
+
+    if (backup_prog_include != [])
+	SCR::Write (.sysconfig.rear.BACKUP_PROG_INCLUDE, YCPListToRearList(backup_prog_include));
+
     SCR::Write (.sysconfig.rear, nil);
 
     return true;
