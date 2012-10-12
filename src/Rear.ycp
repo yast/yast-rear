@@ -50,6 +50,57 @@ global list<string> backup_prog_include = [];
 global list<string> usbdevices = [];
 
 
+// returns list of error messages
+// empty list means no errors
+define list <string> SystemCheckMultipath()
+{
+    define list <string> ret = [];
+
+    map<string, map> storage = Storage::ReReadTargetMap();
+
+    foreach (string device, map devicemap, storage , {
+       if ( devicemap["transport"]:`none == `iscsi  )
+       {
+            y2error("device %1 uses iscsi", device);
+            ret = add (ret, sformat("Device %1 uses iscsi. ", device ));
+       }
+
+
+       list <map> parts = devicemap["partitions"]:[];
+       foreach (map part, parts , { 
+         if ( part["mountby"]:`none == `uuid )
+         {
+                y2error("device %1 is mounted by uuid", device);
+                ret = add (ret, sformat("Device %1 is mounted by uuid. ", device ));
+         }
+         if ( part["type"]:`none == `CT_MULTIPATH )
+         {
+                y2error("device %1 is multipath", device);
+                ret = add (ret, sformat("Device %1 is multipath. ", device ));
+         }
+         if ( contains ( [`reiserfs] , part["used_fs"]:`none  ))
+         {
+                y2error("device %1 has unsupported filesystem", device);
+                ret = add (ret, sformat("Device %1 has unsupported filesystem. ", device ));
+         }
+
+
+       }); 
+
+     });
+    return ret;
+}
+
+
+global define list <string> SystemCheck()
+{
+    define list <string> ret = [];
+    ret =  add (ret, mergestring(SystemCheckMultipath(),"\n"));
+
+    return ret;
+}
+
+
 global define list<string> GetUsbDevices ()
 {
     list<string> usbdevs = [];
@@ -66,6 +117,7 @@ global define list<string> GetUsbDevices ()
          }
 
     });
+    usbdevices = usbdevs;
     return usbdevs;
 }
 

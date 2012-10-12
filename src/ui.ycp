@@ -50,14 +50,6 @@ define list<string> UsbLocations()
    return usblist;
 }
 
-define string CheckSystem()
-{
-   // return translated error or warning from system check
-   // /usr/lib/YaST2/bin/rear_all_checks.sh;
-   // return empty string if no error
-
-   return "";
-}
 
 /**
  * Dialog for seting up Rear
@@ -83,8 +75,9 @@ define symbol RearDialog () {
     list rescue_device = Rear::usbdevices;
     list backup_type = ["NFS", "USB"];
 
-    list<term> expertMenu = [ `item(`id(`additionalDirs), _("Additional Directories in Backup" )) , 
-                              `item(`id(`additionalModules), _("Additional Kernel Modules in Rescue System" )) ];
+    list<term> expertMenu = [ `item(`id(`additionalDirs), _("Additional Directories in Backup" )) ,
+                              `item(`id(`additionalModules), _("Additional Kernel Modules in Rescue System" )),
+                              `item(`id(`scanusb), _("Rescan for USB Devices")) ];
 
     term con = `HBox (`HSpacing (3), `VBox (
         `VSpacing (),
@@ -94,9 +87,7 @@ define symbol RearDialog () {
 		`VSpacing (0.5),
 		`ComboBox (`id(`output), `opt(`notify, `hstretch), _("&Boot Media"), outputlist),
 		`VSpacing (0.5),
-                `HBox (
 		`ComboBox (`id(`rescue_device), `opt(`notify, `hstretch, `editable), _("&Device"), rescue_device),
-		`PushButton (`id(`scanusb), _("&Rescan"))),
 		`VSpacing (0.5)
 	    ), `HSpacing ()
 	)),
@@ -153,39 +144,40 @@ define symbol RearDialog () {
                                   "Do you want to continue and overwrite these settings?" )))
         return `abort;
 
-    boolean isusb = false;
+    boolean rebuild_combobox_flag = false;
+
 
     symbol ret = nil;
     do
     {
+        if (ret == `scanusb )
+        {
+	    rescue_device = Rear::GetUsbDevices();
+            UI::ChangeWidget (`id(`rescue_device), `Items, rescue_device );
+            UI::ChangeWidget (`id(`rescue_device), `Value, rescue_device[0]:"" );
+            usblocation=UsbLocations();
+            rebuild_combobox_flag=false; 
+        }
 
         if ( UI::QueryWidget(`id(`output), `Value ) == "ISO")
            UI::ChangeWidget (`id(`rescue_device), `Enabled, false);
 	else
            UI::ChangeWidget (`id(`rescue_device), `Enabled, true);
 
-        if ( UI::QueryWidget(`id(`backup_type), `Value ) == "USB" && isusb==false)
+        if ( UI::QueryWidget(`id(`backup_type), `Value ) == "USB" && rebuild_combobox_flag==false)
         {
            UI::ChangeWidget (`id(`netfs_url), `Items, usblocation );
            UI::ChangeWidget (`id(`netfs_url), `Value, usblocation[0]:"" );
-           isusb=true;
+           rebuild_combobox_flag=true;
         }
 
-        if ( (string) UI::QueryWidget(`id(`backup_type), `Value ) == "NFS" && isusb==true )
+        if ( (string) UI::QueryWidget(`id(`backup_type), `Value ) == "NFS" && rebuild_combobox_flag==true )
         {
            UI::ChangeWidget (`id(`netfs_url), `Items, nfslocation );
            UI::ChangeWidget (`id(`netfs_url), `Value, nfslocation[0]:"" );
-           isusb=false;
+           rebuild_combobox_flag=false;
         }
 
-        if (ret == `scanusb )
-        {
-	    rescue_device = Rear::GetUsbDevices();
-	    y2error ("%1", Rear::GetUsbDevices());
-            UI::ChangeWidget (`id(`rescue_device), `Items, rescue_device );
-            UI::ChangeWidget (`id(`rescue_device), `Value, rescue_device[0]:"" );
-	    y2error("%1", rescue_device);
-        }
 
 	ret = (symbol) UI::UserInput ();
 
@@ -237,7 +229,7 @@ define symbol RearSequence () {
 
     Progress::NextStage();
 
-    string system_check_message = CheckSystem();
+    string system_check_message = mergestring(Rear::SystemCheck(), "\n");
 
     if ( system_check_message != "" &&
         ! Popup::ContinueCancel ( system_check_message +"\n"+
