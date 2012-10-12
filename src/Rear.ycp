@@ -50,11 +50,12 @@ global list<string> backup_prog_include = [];
 global list<string> usbdevices = [];
 
 
-define list<string> GetUsbDevices ()
+global define list<string> GetUsbDevices ()
 {
     list<string> usbdevs = [];
 
-    map<string, map> storage = Storage::GetTargetMap();
+//    map<string, map> storage = Storage::GetTargetMap();
+    map<string, map> storage = Storage::ReReadTargetMap();
 
     foreach (string device, map devicemap, storage , {
          y2error("device = %1", device); 

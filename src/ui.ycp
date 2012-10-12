@@ -43,13 +43,21 @@ import "Progress";
 
 
 
-define list<string> usblocations()
+define list<string> UsbLocations()
 {
    list <string> usblist = [];
    foreach (string usbdev, Rear::usbdevices, { usblist =  add (usblist, "usb://"+usbdev ); });
    return usblist;
 }
 
+define string CheckSystem()
+{
+   // return translated error or warning from system check
+   // /usr/lib/YaST2/bin/rear_all_checks.sh;
+   // return empty string if no error
+
+   return "";
+}
 
 /**
  * Dialog for seting up Rear
@@ -63,14 +71,14 @@ define symbol RearDialog () {
     string help = _("<p>Here, configure Rear Relax and Recover backup for your computer.</p>") +
     _("<p>.</p>");
 
-    list <string> netfs_url = [ ];
+    list <string> netfs_url = [ Rear::netfs_url ];
     boolean netfs_keep_old_backup = Rear::netfs_keep_old_backup;
     list <string> modules_load = Rear::modules_load;
     list <string> backup_prog_include = Rear::backup_prog_include;
     string output = Rear::output;
     list <string> outputlist = ["ISO", "USB"];
-    list <string> usblocation = usblocations();
-    list <string> nfslocation = ["nfs://host/dir"];
+    list <string> usblocation = UsbLocations();
+    list <string> nfslocation = ["nfs://hostname/directory"];
 
     list rescue_device = Rear::usbdevices;
     list backup_type = ["NFS", "USB"];
@@ -86,7 +94,9 @@ define symbol RearDialog () {
 		`VSpacing (0.5),
 		`ComboBox (`id(`output), `opt(`notify, `hstretch), _("&Boot Media"), outputlist),
 		`VSpacing (0.5),
+                `HBox (
 		`ComboBox (`id(`rescue_device), `opt(`notify, `hstretch, `editable), _("&Device"), rescue_device),
+		`PushButton (`id(`scanusb), _("&Rescan"))),
 		`VSpacing (0.5)
 	    ), `HSpacing ()
 	)),
@@ -122,7 +132,15 @@ define symbol RearDialog () {
 
     string type = toupper(substring(Rear::netfs_url,0,3));
     if (contains(add(backup_type,""), type))
+    {
         UI::ChangeWidget (`id(`backup_type), `Value, type);
+        if ( type == "NFS" )
+        {
+           if ( ! contains (nfslocation, Rear::netfs_url) )
+              nfslocation = prepend (nfslocation, Rear::netfs_url);
+           UI::ChangeWidget (`id(`netfs_url), `Items, nfslocation );
+        }
+    }
     else
         config_conflicts = true;
 
@@ -160,8 +178,17 @@ define symbol RearDialog () {
            isusb=false;
         }
 
+        if (ret == `scanusb )
+        {
+	    rescue_device = Rear::GetUsbDevices();
+	    y2error ("%1", Rear::GetUsbDevices());
+            UI::ChangeWidget (`id(`rescue_device), `Items, rescue_device );
+            UI::ChangeWidget (`id(`rescue_device), `Value, rescue_device[0]:"" );
+	    y2error("%1", rescue_device);
+        }
 
-	ret		= (symbol) UI::UserInput ();
+	ret = (symbol) UI::UserInput ();
+
     } while (!contains ([`back, `abort, `cancel, `next, `ok], ret));
 
     if (ret == `next || ret == `ok)
@@ -175,6 +202,7 @@ define symbol RearDialog () {
 //       Rear::backup_prog_include = Rear::backup_prog_include;
 
     }
+
     return ret;
 }
 
@@ -188,19 +216,35 @@ define symbol RearSequence () {
 
     /* Rear read dialog caption */
     string caption      = _("Reading Rear Configuration");
-    integer steps       = 1;
+    integer steps       = 2;
 
     Progress::New (caption, " ", steps, [
             /* Progress stage 1/2 */
+            _("Analyzing system"),
+            /* Progress stage 2/2 */
             _("Reading rear settings"),
         ], [
             /* Progress step 1/2 */
+            _("Analyzing system..."),
+            /* Progress step 2/2 */
             _("Reading rear settings..."),
+
             /* Progress finished */
             _("Finished")
         ],
         ""
     );
+
+    Progress::NextStage();
+
+    string system_check_message = CheckSystem();
+
+    if ( system_check_message != "" &&
+        ! Popup::ContinueCancel ( system_check_message +"\n"+
+                                  _("Do you want to continue anyways?" )))
+        return `abort;
+
+    Progress::NextStage();
 
     Rear::Read ();
 
