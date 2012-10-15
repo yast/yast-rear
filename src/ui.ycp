@@ -50,11 +50,87 @@ define list<string> UsbLocations()
    return usblist;
 }
 
+/**
+ * Dialog for seting up Rear
+ */
+define symbol RearRunDialog () {
+    // For translators: Caption of the dialog
+    string caption = _("Run Rear");
+
+    // help text for Rear 
+    string help = _("<p>Here, run Rear Relax and Recover backup on your computer.</p>") +
+    _("<p>.</p>");
+
+    term con = `HBox(`HSpacing(1.5), `VSpacing(18),
+    `VBox(
+        `HSpacing(80),
+        `VSpacing(0.5),
+        `LogView (`id (`log), "Rear output:", 8, 0),
+        `VSpacing(0.5),
+        `HBox (
+            `PushButton (`id(`stop), `opt(`key_F5), Label::StopButton ()),
+            `PushButton (`id(`run), `opt(`key_F6), _("Run"))
+        ),
+        `VSpacing(0.5)),
+    `HSpacing(1.5)
+    );
+
+    Wizard::SetContents (caption, con, help, true, true);
+    UI::ChangeWidget (`id (`stop), `Enabled, false);
+
+
+    string test_output  = "";
+    boolean rear_runs = false;
+
+    symbol ret = nil;
+    do
+    {
+        if (rear_runs)
+            ret = (symbol) UI::PollInput();
+        else
+            ret = (symbol) UI::UserInput ();
+
+        if ((boolean) SCR::Read(.background.output_open) &&
+            (integer) SCR::Read(.background.newlines)>0)
+        {
+            // read the output line from rear:
+            list out    = (list)SCR::Read(.background.newout);
+            test_output = out[0]:"";
+            if (test_output != "")
+                UI::ChangeWidget (`id(`log), `LastLine, test_output + "\n");
+        }
+        else if (!(boolean)SCR::Read(.background.output_open) && rear_runs )
+        {
+            Popup::Error(_("Done."));
+            UI::ChangeWidget (`id (`run), `Enabled, true);
+            UI::ChangeWidget (`id (`stop), `Enabled, false);
+            rear_runs = false;
+        }
+        if (ret == `stop)
+        {
+            SCR::Execute(.background.kill);
+            rear_runs = false;
+            UI::ChangeWidget (`id (`run), `Enabled, true);
+            UI::ChangeWidget (`id (`stop), `Enabled, false);
+            ret= nil;
+        }
+        if (ret == `run)
+        {
+            rear_runs = true;
+            SCR::Execute (.background.run_output, "/usr/sbin/rear");
+            UI::ChangeWidget (`id (`stop), `Enabled, true);
+            UI::ChangeWidget (`id (`run), `Enabled, false);
+            ret = nil;
+        }
+        sleep (100);
+    } while (ret == nil); 
+    return ret;
+}
 
 /**
  * Dialog for seting up Rear
  */
-define symbol RearDialog () {
+define symbol RearConfigDialog () {
 
     // For translators: Caption of the dialog
     string caption = _("Rear Configuration");
@@ -77,11 +153,10 @@ define symbol RearDialog () {
 
     list<term> expertMenu = [ `item(`id(`additionalDirs), _("Additional Directories in Backup" )) ,
                               `item(`id(`additionalModules), _("Additional Kernel Modules in Rescue System" )),
-                              `item(`id(`scanusb), _("Rescan for USB Devices")) ];
+                              `item(`id(`scanusb), _("Rescan USB Devices")) ];
 
     term con = `HBox (`HSpacing (3), `VBox (
         `VSpacing (),
-	// frame label
 	`Frame (_("Recovery System"), `HBox (`HSpacing (),
 	    `VBox (
 		`VSpacing (0.5),
@@ -92,7 +167,6 @@ define symbol RearDialog () {
 	    ), `HSpacing ()
 	)),
 	`VSpacing (1.5),
-	// frame label
 	`Frame (_("Backup"), `HBox (`HSpacing (),
 	    `VBox (
 		`VSpacing (0.5),
@@ -111,6 +185,8 @@ define symbol RearDialog () {
 
 
     Wizard::SetContents (caption, con, help, true, true);
+    Wizard::SetNextButton (`next, _("Next"));
+    Wizard::SetAbortButton (`abort, _("Abort"));
 
 
     /* If config file was manually edited and config options are unknown we show a warning */
@@ -205,23 +281,20 @@ define symbol RearSequence () {
 
     Wizard::OpenOKDialog ();
     Wizard::SetDesktopTitleAndIcon("rear");
+    Wizard::SetNextButton (`next, _("Next"));
+    Wizard::SetAbortButton (`abort, _("Abort"));
+
 
     /* Rear read dialog caption */
     string caption      = _("Reading Rear Configuration");
     integer steps       = 2;
 
     Progress::New (caption, " ", steps, [
-            /* Progress stage 1/2 */
             _("Analyzing system"),
-            /* Progress stage 2/2 */
             _("Reading rear settings"),
         ], [
-            /* Progress step 1/2 */
             _("Analyzing system..."),
-            /* Progress step 2/2 */
             _("Reading rear settings..."),
-
-            /* Progress finished */
             _("Finished")
         ],
         ""
@@ -241,16 +314,24 @@ define symbol RearSequence () {
     Rear::Read ();
 
     Progress::NextStage();
-  
-    symbol ret = RearDialog ();
-    if (ret == `next || ret == `finish || ret == `ok)
-    {
+
+    symbol ret=nil;
+    do {
+        ret = RearConfigDialog ();
+
+        if ( ret == `abort ) 
+            return ret;
+
 	Rear::Write ();
-    }
+	Wizard::SetNextButton (`ok, _("Finish"));
+	Wizard::SetAbortButton (`back, _("Back"));
+
+	ret = RearRunDialog ();
+
+    } while (! contains ([`abort, `next, `ok ], ret ));
 
     UI::CloseDialog ();
     return ret;
 }
 
-/* EOF */
 }
