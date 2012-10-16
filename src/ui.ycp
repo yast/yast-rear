@@ -50,6 +50,124 @@ define list<string> UsbLocations()
    return usblist;
 }
 
+define list<string> AvailableModules()
+{
+   string cmd = "lsmod | tail +2 | cut -d ' ' -f1 | tac | tr -s '[:space:]' ' '";
+   map output = (map) SCR::Execute (.target.bash_output, cmd, "");
+   list <string> ret = splitstring (output["stdout"]:"", " ");
+   return ret;
+ 
+
+}
+
+
+define list<string> DirectoriesDialog(list <string> directories)
+{
+    list <string> directories_sav = directories;
+ 
+    UI::OpenDialog(
+                  `VBox( 
+                  `SelectionBox( `id(`dirs), _("Additional Directories to Backup"), directories ),
+                  `HBox(
+                    `PushButton( `id(`adddir), Label::AddButton() ),
+                    `HSpacing(4),
+                    `PushButton( `id(`deldir), Label::DeleteButton() )
+                  ),
+
+                  `HBox(
+                      `PushButton(`id(`ok    ), _( "&OK"     ) ),
+                      `PushButton(`id(`cancel), _( "&Cancel" ) )
+                  )
+
+              ));
+
+    symbol ret=nil;
+    do
+    {
+        if ( ret == `deldir )
+        {
+             string delelem = (string)UI::QueryWidget( `id(`dirs), `CurrentItem);
+             directories = filter (string elem, directories, { return (elem != delelem ); });
+             UI::ChangeWidget( `id(`dirs), `Items, directories);
+        }
+        if ( ret == `adddir )
+        {
+             string addelem = UI::AskForExistingDirectory ( "/", _("Choose Directory"));
+             if ( ! contains(directories,addelem) )
+             {
+                  directories = add(directories, addelem);
+                  UI::ChangeWidget( `id(`dirs), `Items, directories);
+             }
+        }
+        ret = (symbol) UI::UserInput();
+
+    }
+    while (ret != `ok && ret != `cancel );
+ 
+    UI::CloseDialog();
+
+    if ( ret == `cancel )
+            return directories_sav; 
+
+    return directories;
+}
+
+
+define list<string> KernelModulesDialog(list <string> modules)
+{
+    list <string> modules_sav = modules;
+    list <string> all_modules = AvailableModules();
+ 
+    UI::OpenDialog(
+                  `VBox( 
+                  `SelectionBox( `id(`mods), _("Additional Kernel Modules for Rescue System"), modules ),
+                  `HBox(
+                    `MinWidth(15, `ComboBox( `id(`newmod), `opt(`editable), "", all_modules ) ),
+                    `PushButton( `id(`addmod), Label::AddButton() ),
+                    `HSpacing(4),
+                    `PushButton( `id(`delmod), Label::DeleteButton() )
+                  ),
+
+                  `HBox(
+                      `PushButton(`id(`ok    ), _( "&OK"     ) ),
+                      `PushButton(`id(`cancel), _( "&Cancel" ) )
+                  )
+
+              ));
+
+    symbol ret=nil;
+    do
+    {
+        if ( ret == `delmod )
+        {
+             string delelem = (string)UI::QueryWidget( `id(`mods), `CurrentItem);
+             modules = filter (string elem, modules, { return (elem != delelem ); });
+             UI::ChangeWidget( `id(`mods), `Items, modules);
+        }
+        if ( ret == `addmod )
+        {
+             string addelem = (string)UI::QueryWidget( `id(`newmod), `Value);
+             if ( ! contains(modules,addelem) )
+             {
+                  modules = add(modules, addelem);
+                  UI::ChangeWidget( `id(`mods), `Items, modules);
+             }
+        }
+        ret = (symbol) UI::UserInput();
+
+    }
+    while (ret != `ok && ret != `cancel );
+ 
+    UI::CloseDialog();
+
+    if ( ret == `cancel )
+            return modules_sav; 
+
+    return modules;
+}
+
+
+
 /**
  * Dialog for seting up Rear
  */
@@ -257,6 +375,13 @@ define symbol RearConfigDialog () {
            UI::ChangeWidget (`id(`netfs_url), `Value, nfslocation[0]:"" );
            rebuild_combobox_flag=false;
         }
+        
+        if ( ret == `additionalModules)
+            modules_load = KernelModulesDialog(modules_load);
+
+        if ( ret == `additionalDirs)
+            backup_prog_include = DirectoriesDialog(backup_prog_include);
+
 
 
 	ret = (symbol) UI::UserInput ();
@@ -270,8 +395,8 @@ define symbol RearConfigDialog () {
 	Rear::backup		= "NETFS";
 	Rear::netfs_url		= (string) UI::QueryWidget(`id(`netfs_url), `Value );
         Rear::netfs_keep_old_backup = (boolean) UI::QueryWidget(`id(`netfs_keep_old_backup), `Value );
-//       Rear::modules_load = modules_load;
-//       Rear::backup_prog_include = Rear::backup_prog_include;
+        Rear::modules_load = modules_load;
+        Rear::backup_prog_include = backup_prog_include;
 
     }
 
@@ -323,7 +448,7 @@ define symbol RearSequence () {
     do {
         ret = RearConfigDialog ();
 
-        if ( ret == `abort ) 
+        if ( ret == `abort || ret == `cancel ) 
             return ret;
 
 	Rear::Write ();
@@ -332,7 +457,7 @@ define symbol RearSequence () {
 
 	ret = RearRunDialog ();
 
-    } while (! contains ([`abort, `next, `ok ], ret ));
+    } while (! contains ([`abort, `next, `ok, `cancel ], ret ));
 
     UI::CloseDialog ();
     return ret;
