@@ -79,7 +79,7 @@ define symbol RearRunDialog () {
     UI::ChangeWidget (`id (`stop), `Enabled, false);
 
 
-    string test_output  = "";
+    string output  = "";
     boolean rear_runs = false;
 
     symbol ret = nil;
@@ -95,9 +95,9 @@ define symbol RearRunDialog () {
         {
             // read the output line from rear:
             list out    = (list)SCR::Read(.background.newout);
-            test_output = out[0]:"";
-            if (test_output != "")
-                UI::ChangeWidget (`id(`log), `LastLine, test_output + "\n");
+            output = out[0]:"";
+            if (output != "")
+                UI::ChangeWidget (`id(`log), `LastLine, output + "\n");
         }
         else if (!(boolean)SCR::Read(.background.output_open) && rear_runs )
         {
@@ -126,6 +126,10 @@ define symbol RearRunDialog () {
     } while (ret == nil); 
     return ret;
 }
+
+
+
+
 
 /**
  * Dialog for seting up Rear

@@ -125,15 +125,14 @@ global define list<string> GetUsbDevices ()
 
 
 define list<string> RearListToYCPList ( string rearlist ) {
-
     list<string> ycplist = [];
 
     if (rearlist == nil)
         return [];
 
+    rearlist = regexpsub (rearlist, "^ *\\((.*)\\) *$", "\\1");
     ycplist = splitstring (rearlist, " ");
-    if ( ycplist[0]:"" == "(" ) ycplist = remove(ycplist,0);
-    if (ycplist[size(ycplist)-1]:"" == ")") ycplist = remove(ycplist,size(ycplist)-1);
+    ycplist = filter (string element, ycplist, { return (element != ""); });
 
     return ycplist;
 
