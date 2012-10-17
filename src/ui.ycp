@@ -60,7 +60,9 @@ define list<string> AvailableModules()
 
 }
 
-
+/**
+ * Dialog to Choose Directories
+ */
 define list<string> DirectoriesDialog(list <string> directories)
 {
     list <string> directories_sav = directories;
@@ -112,7 +114,9 @@ define list<string> DirectoriesDialog(list <string> directories)
     return directories;
 }
 
-
+/**
+ * Dialog to Choose Kernel Modules
+ */
 define list<string> KernelModulesDialog(list <string> modules)
 {
     list <string> modules_sav = modules;
@@ -169,44 +173,28 @@ define list<string> KernelModulesDialog(list <string> modules)
 
 
 /**
- * Dialog for seting up Rear
+ * Dialog to run rear
  */
 define symbol RearRunDialog () {
-    // For translators: Caption of the dialog
-    string caption = _("Run Rear");
 
-    // help text for Rear 
-    string help = _("<p>Here, run Rear Relax and Recover backup on your computer.</p>") +
-    _("<p>.</p>");
-
-    term con = `HBox(`HSpacing(1.5), `VSpacing(18),
+    UI::OpenDialog(`opt(`decorated),
+    `HBox(`HSpacing(1.5), `VSpacing(18),
     `VBox(
         `HSpacing(80),
         `VSpacing(0.5),
         `LogView (`id (`log), "Rear output:", 8, 0),
-        `VSpacing(0.5),
-        `HBox (
-            `PushButton (`id(`stop), `opt(`key_F5), Label::StopButton ()),
-            `PushButton (`id(`run), `opt(`key_F6), _("Run"))
-        ),
+        `PushButton (`id(`close), Label::CloseButton ()),
         `VSpacing(0.5)),
     `HSpacing(1.5)
-    );
-
-    Wizard::SetContents (caption, con, help, true, true);
-    UI::ChangeWidget (`id (`stop), `Enabled, false);
-
+    ));
 
     string output  = "";
-    boolean rear_runs = false;
+    SCR::Execute (.background.run_output, "/usr/sbin/rear");
 
     symbol ret = nil;
     do
     {
-        if (rear_runs)
-            ret = (symbol) UI::PollInput();
-        else
-            ret = (symbol) UI::UserInput ();
+        ret = (symbol) UI::PollInput();
 
         if ((boolean) SCR::Read(.background.output_open) &&
             (integer) SCR::Read(.background.newlines)>0)
@@ -217,31 +205,16 @@ define symbol RearRunDialog () {
             if (output != "")
                 UI::ChangeWidget (`id(`log), `LastLine, output + "\n");
         }
-        else if (!(boolean)SCR::Read(.background.output_open) && rear_runs )
+        else if (!(boolean)SCR::Read(.background.output_open))
         {
-            Popup::Error(_("Done."));
-            UI::ChangeWidget (`id (`run), `Enabled, true);
-            UI::ChangeWidget (`id (`stop), `Enabled, false);
-            rear_runs = false;
+            ret = (symbol) UI::UserInput();
         }
-        if (ret == `stop)
-        {
-            SCR::Execute(.background.kill);
-            rear_runs = false;
-            UI::ChangeWidget (`id (`run), `Enabled, true);
-            UI::ChangeWidget (`id (`stop), `Enabled, false);
-            ret= nil;
-        }
-        if (ret == `run)
-        {
-            rear_runs = true;
-            SCR::Execute (.background.run_output, "/usr/sbin/rear");
-            UI::ChangeWidget (`id (`stop), `Enabled, true);
-            UI::ChangeWidget (`id (`run), `Enabled, false);
-            ret = nil;
-        }
+
         sleep (100);
-    } while (ret == nil); 
+    } while (ret != `close ); 
+
+    SCR::Execute(.background.kill);
+    UI::CloseDialog();
     return ret;
 }
 
@@ -250,7 +223,7 @@ define symbol RearRunDialog () {
 
 
 /**
- * Dialog for seting up Rear
+ * Dialog for setup up Rear
  */
 define symbol RearConfigDialog () {
 
@@ -270,7 +243,7 @@ define symbol RearConfigDialog () {
     list <string> usblocation = UsbLocations();
     list <string> nfslocation = ["nfs://hostname/directory"];
 
-    list rescue_device = Rear::usbdevices;
+//    list rescue_device = Rear::usbdevices;
     list backup_type = ["NFS", "USB"];
 
     list<term> expertMenu = [ `item(`id(`additionalDirs), _("Additional Directories in Backup" )) ,
@@ -283,8 +256,8 @@ define symbol RearConfigDialog () {
 	    `VBox (
 		`VSpacing (0.5),
 		`ComboBox (`id(`output), `opt(`notify, `hstretch), _("&Boot Media"), outputlist),
-		`VSpacing (0.5),
-		`ComboBox (`id(`rescue_device), `opt(`notify, `hstretch, `editable), _("&Device"), rescue_device),
+//		`VSpacing (0.5),
+//		`ComboBox (`id(`rescue_device), `opt(`notify, `hstretch, `editable), _("&Device"), rescue_device),
 		`VSpacing (0.5)
 	    ), `HSpacing ()
 	)),
@@ -302,13 +275,13 @@ define symbol RearConfigDialog () {
 	)),
 	`VSpacing (0.5),
         `Right( `MenuButton( _("Advanced"), expertMenu )),
+	`VSpacing (0.5),
+        `PushButton(`id(`runrear    ), _( "Save and Run") ),
 	`VStretch ()
     ), `HSpacing(3));
 
 
     Wizard::SetContents (caption, con, help, true, true);
-    Wizard::SetNextButton (`next, _("Next"));
-    Wizard::SetAbortButton (`abort, _("Abort"));
 
 
     /* If config file was manually edited and config options are unknown we show a warning */
@@ -350,17 +323,17 @@ define symbol RearConfigDialog () {
     {
         if (ret == `scanusb )
         {
-	    rescue_device = Rear::GetUsbDevices();
-            UI::ChangeWidget (`id(`rescue_device), `Items, rescue_device );
-            UI::ChangeWidget (`id(`rescue_device), `Value, rescue_device[0]:"" );
+//	    rescue_device = Rear::GetUsbDevices();
+//            UI::ChangeWidget (`id(`rescue_device), `Items, rescue_device );
+//            UI::ChangeWidget (`id(`rescue_device), `Value, rescue_device[0]:"" );
             usblocation=UsbLocations();
             rebuild_combobox_flag=false; 
         }
 
-        if ( UI::QueryWidget(`id(`output), `Value ) == "ISO")
-           UI::ChangeWidget (`id(`rescue_device), `Enabled, false);
-	else
-           UI::ChangeWidget (`id(`rescue_device), `Enabled, true);
+//        if ( UI::QueryWidget(`id(`output), `Value ) == "ISO")
+  //         UI::ChangeWidget (`id(`rescue_device), `Enabled, false);
+//	else
+  //         UI::ChangeWidget (`id(`rescue_device), `Enabled, true);
 
         if ( UI::QueryWidget(`id(`backup_type), `Value ) == "USB" && rebuild_combobox_flag==false)
         {
@@ -375,13 +348,21 @@ define symbol RearConfigDialog () {
            UI::ChangeWidget (`id(`netfs_url), `Value, nfslocation[0]:"" );
            rebuild_combobox_flag=false;
         }
-        
+
         if ( ret == `additionalModules)
             modules_load = KernelModulesDialog(modules_load);
 
         if ( ret == `additionalDirs)
             backup_prog_include = DirectoriesDialog(backup_prog_include);
 
+        if ( ret == `runrear)
+        {
+	   if ( "USB" != (string) UI::QueryWidget(`id(`output), `Value ) || Popup::ContinueCancel ("Your USB media will be overwritten. To you want to continue?" ))
+           {
+               Rear::Write ();
+	       RearRunDialog();
+           }
+        }
 
 
 	ret = (symbol) UI::UserInput ();
@@ -410,9 +391,6 @@ define symbol RearSequence () {
 
     Wizard::OpenOKDialog ();
     Wizard::SetDesktopTitleAndIcon("rear");
-    Wizard::SetNextButton (`next, _("Next"));
-    Wizard::SetAbortButton (`abort, _("Abort"));
-
 
     /* Rear read dialog caption */
     string caption      = _("Reading Rear Configuration");
@@ -444,20 +422,9 @@ define symbol RearSequence () {
 
     Progress::NextStage();
 
-    symbol ret=nil;
-    do {
-        ret = RearConfigDialog ();
-
-        if ( ret == `abort || ret == `cancel ) 
-            return ret;
-
-	Rear::Write ();
-	Wizard::SetNextButton (`ok, _("Finish"));
-	Wizard::SetAbortButton (`back, _("Back"));
-
-	ret = RearRunDialog ();
-
-    } while (! contains ([`abort, `next, `ok, `cancel ], ret ));
+    symbol ret = RearConfigDialog ();
+    if ( ret == `next || ret == `ok )
+        Rear::Write ();
 
     UI::CloseDialog ();
     return ret;
