@@ -32,6 +32,7 @@
 textdomain "rear";
 
 import "Rear";
+import "RearSystemCheck";
 import "Label";
 import "Message";
 import "Package";
@@ -42,22 +43,21 @@ import "Storage";
 import "Progress";
 
 
-
-define list<string> UsbLocations()
-{
-   list <string> usblist = [];
-   foreach (string usbdev, Rear::usbdevices, { usblist =  add (usblist, "usb://"+usbdev ); });
-   return usblist;
-}
-
 define list<string> AvailableModules()
 {
    string cmd = "lsmod | tail +2 | cut -d ' ' -f1 | tac | tr -s '[:space:]' ' '";
    map output = (map) SCR::Execute (.target.bash_output, cmd, "");
    list <string> ret = splitstring (output["stdout"]:"", " ");
    return ret;
- 
+}
 
+
+define list<term> UsbTerms( )
+{
+    return maplist(string name, string text, Rear::GetUsbPartitions(),
+    {
+        return `item(`id(name), text) ;
+    });
 }
 
 /**
@@ -66,9 +66,9 @@ define list<string> AvailableModules()
 define list<string> DirectoriesDialog(list <string> directories)
 {
     list <string> directories_sav = directories;
- 
+
     UI::OpenDialog(
-                  `VBox( 
+                  `VBox(
                   `SelectionBox( `id(`dirs), _("Additional Directories to Backup"), directories ),
                   `HBox(
                     `PushButton( `id(`adddir), Label::AddButton() ),
@@ -188,8 +188,10 @@ define symbol RearRunDialog () {
     `HSpacing(1.5)
     ));
 
+    UI::ChangeWidget (`id(`close), `Enabled, false);
+
     string output  = "";
-    SCR::Execute (.background.run_output, "/usr/sbin/rear");
+    SCR::Execute (.background.run_output, "bash -c \"/usr/sbin/rear mkbackup; sleep 1\"");
 
     symbol ret = nil;
     do
@@ -207,9 +209,9 @@ define symbol RearRunDialog () {
         }
         else if (!(boolean)SCR::Read(.background.output_open))
         {
+            UI::ChangeWidget (`id(`close), `Enabled, true);
             ret = (symbol) UI::UserInput();
         }
-
         sleep (100);
     } while (ret != `close ); 
 
@@ -236,14 +238,13 @@ define symbol RearConfigDialog () {
 
     list <string> netfs_url = [ Rear::netfs_url ];
     boolean netfs_keep_old_backup = Rear::netfs_keep_old_backup;
-    list <string> modules_load = Rear::modules_load;
-    list <string> backup_prog_include = Rear::backup_prog_include;
+    list<string> modules_load = Rear::modules_load;
+    list<string> backup_prog_include = Rear::backup_prog_include;
     string output = Rear::output;
-    list <string> outputlist = ["ISO", "USB"];
-    list <string> usblocation = UsbLocations();
-    list <string> nfslocation = ["nfs://hostname/directory"];
+    list<string> outputlist = ["ISO", "USB"];
+    list<term> usbpartitions = UsbTerms();
+    list<string> nfslocation = ["nfs://hostname/directory"];
 
-//    list rescue_device = Rear::usbdevices;
     list backup_type = ["NFS", "USB"];
 
     list<term> expertMenu = [ `item(`id(`additionalDirs), _("Additional Directories in Backup" )) ,
@@ -256,8 +257,6 @@ define symbol RearConfigDialog () {
 	    `VBox (
 		`VSpacing (0.5),
 		`ComboBox (`id(`output), `opt(`notify, `hstretch), _("&Boot Media"), outputlist),
-//		`VSpacing (0.5),
-//		`ComboBox (`id(`rescue_device), `opt(`notify, `hstretch, `editable), _("&Device"), rescue_device),
 		`VSpacing (0.5)
 	    ), `HSpacing ()
 	)),
@@ -267,7 +266,7 @@ define symbol RearConfigDialog () {
 		`VSpacing (0.5),
 		`ComboBox (`id(`backup_type), `opt(`notify, `hstretch), _("&Backup Media"), backup_type),
 		`VSpacing (0.5),
-		`ComboBox (`id(`netfs_url), `opt(`notify, `hstretch, `editable), _("&Location"), netfs_url),
+                `ReplacePoint(`id(`rp), `ComboBox (`id(`netfs_url), `opt(`notify, `hstretch, `editable), _("&Location"), netfs_url)),
 		`VSpacing (0.5),
 		`CheckBox (`id(`netfs_keep_old_backup), `opt(`notify), _("&Keep old backup"), netfs_keep_old_backup),
 		`VSpacing (0.5)
@@ -310,43 +309,47 @@ define symbol RearConfigDialog () {
         config_conflicts = true;
 
 
-    if (config_conflicts && 
-        ! Popup::ContinueCancel ( _("Your rear configuration file contains options this YaST2 module cannot configure.\n" 
+    if (config_conflicts &&
+        ! Popup::ContinueCancel ( _("Your rear configuration file contains options this YaST2 module cannot configure.\n"
                                   "Do you want to continue and overwrite these settings?" )))
         return `abort;
 
-    boolean rebuild_combobox_flag = false;
 
+    // this flag ensures that the combox is correctly refilled
+    // when the USB/NFS combobox is changed
+    boolean rebuild_combobox_flag = false;
 
     symbol ret = nil;
     do
     {
-        if (ret == `scanusb )
-        {
-//	    rescue_device = Rear::GetUsbDevices();
-//            UI::ChangeWidget (`id(`rescue_device), `Items, rescue_device );
-//            UI::ChangeWidget (`id(`rescue_device), `Value, rescue_device[0]:"" );
-            usblocation=UsbLocations();
-            rebuild_combobox_flag=false; 
-        }
-
-//        if ( UI::QueryWidget(`id(`output), `Value ) == "ISO")
-  //         UI::ChangeWidget (`id(`rescue_device), `Enabled, false);
-//	else
-  //         UI::ChangeWidget (`id(`rescue_device), `Enabled, true);
-
         if ( UI::QueryWidget(`id(`backup_type), `Value ) == "USB" && rebuild_combobox_flag==false)
         {
-           UI::ChangeWidget (`id(`netfs_url), `Items, usblocation );
-           UI::ChangeWidget (`id(`netfs_url), `Value, usblocation[0]:"" );
+           UI::ReplaceWidget(`id(`rp), `ComboBox (`id(`netfs_url), `opt(`notify, `hstretch), _("&Location"), usbpartitions));
            rebuild_combobox_flag=true;
         }
 
         if ( (string) UI::QueryWidget(`id(`backup_type), `Value ) == "NFS" && rebuild_combobox_flag==true )
         {
-           UI::ChangeWidget (`id(`netfs_url), `Items, nfslocation );
-           UI::ChangeWidget (`id(`netfs_url), `Value, nfslocation[0]:"" );
+           UI::ReplaceWidget(`id(`rp), `ComboBox (`id(`netfs_url), `opt(`notify, `hstretch, `editable), _("&Location"), nfslocation));
            rebuild_combobox_flag=false;
+        }
+
+        if ( ret == `runrear)
+        {
+	   if ( "USB" != (string) UI::QueryWidget(`id(`output), `Value ) || 
+                Popup::ContinueCancel ("Your USB media will be overwritten. To you want to continue?" ))
+           {
+               Rear::Write ();
+               // TODO we need to store the variable in Rear:: first
+	       RearRunDialog();
+           }
+        }
+
+        if (ret == `scanusb )
+        {
+           usbpartitions=UsbTerms();
+           if ( UI::QueryWidget(`id(`backup_type), `Value ) == "USB" )
+               UI::ChangeWidget (`id(`netfs_url), `Items, usbpartitions );
         }
 
         if ( ret == `additionalModules)
@@ -355,15 +358,6 @@ define symbol RearConfigDialog () {
         if ( ret == `additionalDirs)
             backup_prog_include = DirectoriesDialog(backup_prog_include);
 
-        if ( ret == `runrear)
-        {
-	   if ( "USB" != (string) UI::QueryWidget(`id(`output), `Value ) || Popup::ContinueCancel ("Your USB media will be overwritten. To you want to continue?" ))
-           {
-               Rear::Write ();
-	       RearRunDialog();
-           }
-        }
-
 
 	ret = (symbol) UI::UserInput ();
 
@@ -371,14 +365,12 @@ define symbol RearConfigDialog () {
 
     if (ret == `next || ret == `ok)
     {
-	Rear::modified		= true;
-	Rear::output		= (string) UI::QueryWidget(`id(`output), `Value );
-	Rear::backup		= "NETFS";
-	Rear::netfs_url		= (string) UI::QueryWidget(`id(`netfs_url), `Value );
+	Rear::modified		    = true;
+	Rear::output		    = (string) UI::QueryWidget(`id(`output), `Value );
+	Rear::netfs_url		    = (string) UI::QueryWidget(`id(`netfs_url), `Value );
         Rear::netfs_keep_old_backup = (boolean) UI::QueryWidget(`id(`netfs_keep_old_backup), `Value );
-        Rear::modules_load = modules_load;
-        Rear::backup_prog_include = backup_prog_include;
-
+        Rear::modules_load          = modules_load;
+        Rear::backup_prog_include   = backup_prog_include;
     }
 
     return ret;
@@ -409,10 +401,10 @@ define symbol RearSequence () {
 
     Progress::NextStage();
 
-    string system_check_message = mergestring(Rear::SystemCheck(), "\n");
+    string system_check_message = RearSystemCheck::SystemCheck();
 
-    if ( system_check_message != "" &&
-        ! Popup::ContinueCancel ( system_check_message +"\n"+
+    if ( system_check_message != nil &&
+        ! Popup::ContinueCancel ( _("This system is not supported.") +"\n" +system_check_message +"\n"+
                                   _("Do you want to continue anyways?" )))
         return `abort;
 

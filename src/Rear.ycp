@@ -47,83 +47,43 @@ global string netfs_url = "";
 global boolean netfs_keep_old_backup = true;
 global list<string> modules_load = [];
 global list<string> backup_prog_include = [];
-global list<string> usbdevices = [];
+global map<string,string> usbpartitions = $[];
 
 
-// returns list of error messages
-// empty list means no errors
-define list <string> SystemCheckMultipath()
-{
-    define list <string> ret = [];
-
-    map<string, map> storage = Storage::ReReadTargetMap();
-
-    foreach (string device, map devicemap, storage , {
-       if ( devicemap["transport"]:`none == `iscsi  )
-       {
-            y2error("device %1 uses iscsi", device);
-            ret = add (ret, sformat("Device %1 uses iscsi. ", device ));
-       }
-
-
-       list <map> parts = devicemap["partitions"]:[];
-       foreach (map part, parts , { 
-         if ( part["mountby"]:`none == `uuid )
-         {
-                y2error("device %1 is mounted by uuid", device);
-                ret = add (ret, sformat("Device %1 is mounted by uuid. ", device ));
-         }
-         if ( part["type"]:`none == `CT_MULTIPATH )
-         {
-                y2error("device %1 is multipath", device);
-                ret = add (ret, sformat("Device %1 is multipath. ", device ));
-         }
-         if ( contains ( [`reiserfs] , part["used_fs"]:`none  ))
-         {
-                y2error("device %1 has unsupported filesystem", device);
-                ret = add (ret, sformat("Device %1 has unsupported filesystem. ", device ));
-         }
-
-
-       }); 
-
-     });
-    return ret;
-}
-
-
-global define list <string> SystemCheck()
-{
-    define list <string> ret = [];
-    ret =  add (ret, mergestring(SystemCheckMultipath(),"\n"));
-
-    return ret;
-}
-
-
-global define list<string> GetUsbDevices ()
+/*
+ * Returns a Map of Partitons on USB Volumes
+ *
+*/
+global define map<string,string> GetUsbPartitions ()
 {
     list<string> usbdevs = [];
+    map <string, string> usbparts = $[];
 
-//    map<string, map> storage = Storage::GetTargetMap();
     map<string, map> storage = Storage::ReReadTargetMap();
 
-    foreach (string device, map devicemap, storage , {
-         y2error("device = %1", device); 
-         if ( devicemap["transport"]:`none == `usb ) 
-         {
-                y2error("device %1 is a usb device", device);
-                usbdevs = add(usbdevs, device);
-         }
+    foreach (string device, map devicemap, storage ,
+    {
+        if ( devicemap["transport"]:`none == `usb )
+        {
+            list <map> parts = devicemap["partitions"]:[];
+            foreach (map part, parts ,
+            {
+                string  dev = part["device"]:"";
+		integer size_k = part["size_k"]:0 ;
+                usbparts[sformat("usb://%1", dev)]=sformat ("%1 (%2)", dev, Storage::KByteToHumanString(size_k));
+            });
 
+        }
     });
-    usbdevices = usbdevs;
-    return usbdevs;
+    usbpartitions = usbparts;
+    return usbparts;
 }
 
 
 
-
+/*
+ * Convert List from Config File to YCP List
+*/
 define list<string> RearListToYCPList ( string rearlist ) {
     list<string> ycplist = [];
 
@@ -135,23 +95,22 @@ define list<string> RearListToYCPList ( string rearlist ) {
     ycplist = filter (string element, ycplist, { return (element != ""); });
 
     return ycplist;
-
 }
 
+
+/*
+ * Convert YCP List to Format for Config File
+*/
 define string YCPListToRearList ( list<string> ycplist ) {
     return "(" + mergestring (ycplist, " " ) + ")";
 }
 
-
-
 /**
  * Read rear settings from /etc/rear/local.conf
- * @return true when file exists
+ * returns true when file exists
  */
-global define boolean ReadSysconfig () {
-
-    usbdevices = GetUsbDevices();
-
+global define boolean ReadSysconfig ()
+{
     if (FileUtils::Exists ("/etc/rear/local.conf"))
     {
 	backup = (string) SCR::Read (.sysconfig.rear.BACKUP);
@@ -172,7 +131,6 @@ global define boolean ReadSysconfig () {
         else
 	    netfs_keep_old_backup = true;
 
-
 	string modules_load_tmp = (string) SCR::Read (.sysconfig.rear.MODULES_LOAD);
         modules_load = RearListToYCPList( modules_load_tmp);
 
@@ -186,26 +144,23 @@ global define boolean ReadSysconfig () {
 
 /**
  * Read all rear settings
- * @return true on success
  */
-global define boolean Read () {
-
+global define boolean Read ()
+{
+    GetUsbPartitions ();
     ReadSysconfig ();
-
     return true;
 }
 
 /**
  * Write all rear settings
- * @return true on success
  */
-global define boolean Write () {
-
+global define boolean Write ()
+{
     if (!modified)
 	return true;
 
-    if (backup != "")
-	SCR::Write (.sysconfig.rear.BACKUP, backup);
+    SCR::Write (.sysconfig.rear.BACKUP, "NETFS");
 
     if (output != "")
 	SCR::Write (.sysconfig.rear.OUTPUT, output);

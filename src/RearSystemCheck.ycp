@@ -1,0 +1,113 @@
+/* ------------------------------------------------------------------------------
+ * Copyright (c) 2006-2012 Novell, Inc. All Rights Reserved.
+ *
+ *
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of version 2 of the GNU General Public License as published by the
+ * Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, contact Novell, Inc.
+ *
+ * To contact Novell about this file by physical or electronic mail, you may find
+ * current contact information at www.novell.com.
+ * ------------------------------------------------------------------------------
+ */
+
+ /**
+ * File:	modules/RearSystemCheck.ycp
+ * Package:	system checks for rear support
+ * Summary:	checks if the system is supported by rear
+ * Authors:	Thomas Goettlicher <tgoettlicher@suse.de>
+ *
+ * $Id$
+ *
+ * Checks if the system is supported by rear
+ */
+
+{
+
+module "RearSystemCheck";
+textdomain "rear";
+
+import "FileUtils";
+import "Storage";
+
+
+
+/*
+ * check bootloader
+ * returns error message if system is not supported
+*/
+
+define string SystemCheckBootloader()
+{
+    return nil;
+}
+
+/*
+ * checks disc for
+ *  - iscsi
+ *  - multipath
+ *  - mountby uuid
+ *  - filesystem
+ * returns error message if system is not supported, otherwise nil
+*/
+define string SystemCheckDisk()
+{
+    string value = nil;
+ 
+    map<string, map> storage = Storage::GetTargetMap();
+
+    foreach (string device, map devicemap, storage , {
+       // check devices
+       if ( devicemap["transport"]:`none == `iscsi  )
+            value = sformat(_("Device %1 uses iscsi."), device );
+
+       list <map> parts = devicemap["partitions"]:[];
+       foreach (map part, parts , {
+          string dev = part["device"]:"";
+
+          // check partitions
+          if ( part["mountby"]:`none == `uuid )
+              value = sformat("Device %1 is mounted by uuid.", dev );
+
+          if ( part["type"]:`none == `CT_MULTIPATH )
+              value = sformat("Device %1 is multipath.", dev );
+
+          if ( contains ( [`reiserfs] , part["used_fs"]:`none  ))
+              value = sformat("Device %1 has unsupported filesystem. ", dev );
+       });
+
+     });
+    return value;
+}
+
+/*
+ * runs all system checks
+ * make sure to add your function call here if you add further checks
+ * returns error message if system is not supported, otherwise nil
+*/
+
+global define string SystemCheck()
+{
+    string ret =  nil;
+
+    ret = SystemCheckDisk();
+    if ( ret != nil )
+        return ret;
+
+    ret = SystemCheckBootloader();
+    if ( ret != nil )
+        return ret;
+
+    return nil;
+}
+
+
+/* EOF */
+}

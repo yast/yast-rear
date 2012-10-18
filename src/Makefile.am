@@ -12,7 +12,8 @@ desktop_DATA =			\
 	rear.desktop
 
 module_DATA =			\
-	Rear.ycp
+	Rear.ycp		\
+	RearSystemCheck.ycp
 
 EXTRA_DIST = $(client_DATA) $(ynclude_DATA) $(module_DATA) $(desktop_DATA)
 
