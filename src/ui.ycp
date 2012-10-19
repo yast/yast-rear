@@ -390,6 +390,7 @@ define symbol RearSequence () {
 
     Wizard::OpenOKDialog ();
     Wizard::SetDesktopTitleAndIcon("rear");
+    Storage::InitLibstorage(true); // true: read-only
 
     /* Rear read dialog caption */
     string caption      = _("Reading Rear Configuration");

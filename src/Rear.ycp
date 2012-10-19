@@ -61,7 +61,7 @@ global define map<string,string> GetUsbPartitions ()
 
     map<string, map> storage = Storage::ReReadTargetMap();
 
-    foreach (string device, map devicemap, storage ,
+    foreach (string device, map devicemap, storage,
     {
         if ( devicemap["transport"]:`none == `usb )
         {
