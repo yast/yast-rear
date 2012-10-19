@@ -350,7 +350,7 @@ define symbol RearConfigDialog () {
         if ( ret == `runrear)
         {
 	   if ( "USB" != (string) UI::QueryWidget(`id(`output), `Value ) || 
-                Popup::ContinueCancel ("Your USB media will be overwritten. To you want to continue?" ))
+                Popup::ContinueCancel (_("Your USB media will be overwritten. Do you want to continue?" )))
            {
                SaveConfig(modules_load, backup_prog_include);
                Rear::Write ();
