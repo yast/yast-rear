@@ -114,6 +114,19 @@ define list<string> DirectoriesDialog(list <string> directories)
     return directories;
 }
 
+define boolean SaveConfig ( list<string> modules_load, list<string> backup_prog_include )
+{
+    Rear::modified		= true;
+    Rear::output		= (string) UI::QueryWidget(`id(`output), `Value );
+    Rear::netfs_url		= (string) UI::QueryWidget(`id(`netfs_url), `Value );
+    Rear::netfs_keep_old_backup = (boolean) UI::QueryWidget(`id(`netfs_keep_old_backup), `Value );
+    Rear::modules_load          = modules_load;
+    Rear::backup_prog_include   = backup_prog_include;
+
+    return true;
+}
+
+
 /**
  * Dialog to Choose Kernel Modules
  */
@@ -339,8 +352,8 @@ define symbol RearConfigDialog () {
 	   if ( "USB" != (string) UI::QueryWidget(`id(`output), `Value ) || 
                 Popup::ContinueCancel ("Your USB media will be overwritten. To you want to continue?" ))
            {
+               SaveConfig(modules_load, backup_prog_include);
                Rear::Write ();
-               // TODO we need to store the variable in Rear:: first
 	       RearRunDialog();
            }
         }
@@ -364,17 +377,11 @@ define symbol RearConfigDialog () {
     } while (!contains ([`back, `abort, `cancel, `next, `ok], ret));
 
     if (ret == `next || ret == `ok)
-    {
-	Rear::modified		    = true;
-	Rear::output		    = (string) UI::QueryWidget(`id(`output), `Value );
-	Rear::netfs_url		    = (string) UI::QueryWidget(`id(`netfs_url), `Value );
-        Rear::netfs_keep_old_backup = (boolean) UI::QueryWidget(`id(`netfs_keep_old_backup), `Value );
-        Rear::modules_load          = modules_load;
-        Rear::backup_prog_include   = backup_prog_include;
-    }
+        SaveConfig(modules_load, backup_prog_include);
 
     return ret;
 }
+
 
 /**
  * The whole sequence
