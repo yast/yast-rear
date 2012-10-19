@@ -389,7 +389,8 @@ define symbol RearConfigDialog () {
 define symbol RearSequence () {
 
     Wizard::OpenOKDialog ();
-    Wizard::SetDesktopTitleAndIcon("rear");
+    Wizard::SetDesktopTitle( _("Rear Configuration") );
+    Wizard::SetDesktopIcon("backup");
     Storage::InitLibstorage(true); // true: read-only
 
     /* Rear read dialog caption */
