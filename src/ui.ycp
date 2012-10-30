@@ -42,17 +42,26 @@ import "Wizard";
 import "Storage";
 import "Progress";
 
-
-define list<string> AvailableModules()
+/**
+ * returns currently loaded kernel modules 
+ */
+define list<term> UsedModules()
 {
-   string cmd = "lsmod | tail +2 | cut -d ' ' -f1 | tac | tr -s '[:space:]' ' '";
-   map output = (map) SCR::Execute (.target.bash_output, cmd, "");
-   list <string> ret = splitstring (output["stdout"]:"", " ");
-   return ret;
+    list<term> modules = [];
+
+    string cmd = "lsmod | tail +2 | cut -d ' ' -f1 | tac | tr -s '[:space:]' ' '";
+    map output = (map) SCR::Execute (.target.bash_output, cmd, "");
+    list <string> mods = splitstring (output["stdout"]:"", " ");
+
+    integer n=1;
+    foreach ( string mod, mods, { modules = add(modules, `item(`id(mod), sformat("%1. %2",n,mod ))); n=n+1; } );
+    return modules; 
 }
 
-
-define list<term> UsbTerms( )
+/*
+ * returns availible partitions on usb media
+ */ 
+define list<term> UsbPartitions( )
 {
     return maplist(string name, string text, Rear::GetUsbPartitions(),
     {
@@ -65,6 +74,7 @@ define list<term> UsbTerms( )
  */
 define list<string> DirectoriesDialog(list <string> directories)
 {
+    // store original value of directories for the case that the users clicks cancel
     list <string> directories_sav = directories;
 
     UI::OpenDialog(
@@ -122,6 +132,7 @@ define boolean SaveConfig ( list<string> modules_load, list<string> backup_prog_
     Rear::netfs_keep_old_backup = (boolean) UI::QueryWidget(`id(`netfs_keep_old_backup), `Value );
     Rear::modules_load          = modules_load;
     Rear::backup_prog_include   = backup_prog_include;
+    Rear::Write ();
 
     return true;
 }
@@ -132,14 +143,14 @@ define boolean SaveConfig ( list<string> modules_load, list<string> backup_prog_
  */
 define list<string> KernelModulesDialog(list <string> modules)
 {
+    // store original value of modules for the case that the users clicks cancel
     list <string> modules_sav = modules;
-    list <string> all_modules = AvailableModules();
  
     UI::OpenDialog(
-                  `VBox( 
+                  `VBox(
                   `SelectionBox( `id(`mods), _("Additional Kernel Modules for Rescue System"), modules ),
                   `HBox(
-                    `MinWidth(15, `ComboBox( `id(`newmod), `opt(`editable), "", all_modules ) ),
+                    `MinWidth(15, `ComboBox( `id(`newmod), `opt(`editable), "", UsedModules() ) ),
                     `PushButton( `id(`addmod), Label::AddButton() ),
                     `HSpacing(4),
                     `PushButton( `id(`delmod), Label::DeleteButton() )
@@ -174,11 +185,11 @@ define list<string> KernelModulesDialog(list <string> modules)
 
     }
     while (ret != `ok && ret != `cancel );
- 
+
     UI::CloseDialog();
 
     if ( ret == `cancel )
-            return modules_sav; 
+            return modules_sav;
 
     return modules;
 }
@@ -249,21 +260,24 @@ define symbol RearConfigDialog () {
     string help = _("<p>Here, configure Rear Relax and Recover backup for your computer.</p>") +
     _("<p>.</p>");
 
+    // get varibales from config
     list <string> netfs_url = [ Rear::netfs_url ];
     boolean netfs_keep_old_backup = Rear::netfs_keep_old_backup;
     list<string> modules_load = Rear::modules_load;
     list<string> backup_prog_include = Rear::backup_prog_include;
     string output = Rear::output;
-    list<string> outputlist = ["ISO", "USB"];
-    list<term> usbpartitions = UsbTerms();
+
+    // set available options
     list<string> nfslocation = ["nfs://hostname/directory"];
-
     list backup_type = ["NFS", "USB"];
+    list<string> outputlist = ["ISO", "USB"];
 
+    // prepare advanced menu
     list<term> expertMenu = [ `item(`id(`additionalDirs), _("Additional Directories in Backup" )) ,
                               `item(`id(`additionalModules), _("Additional Kernel Modules in Rescue System" )),
                               `item(`id(`scanusb), _("Rescan USB Devices")) ];
 
+    // prepare main dialog
     term con = `HBox (`HSpacing (3), `VBox (
         `VSpacing (),
 	`Frame (_("Recovery System"), `HBox (`HSpacing (),
@@ -299,6 +313,11 @@ define symbol RearConfigDialog () {
     /* If config file was manually edited and config options are unknown we show a warning */
     boolean config_conflicts = false;
 
+
+    /* set settings according to options read from config file. */
+    if ( Rear::backup != "NETFS" && Rear::backup !=  "" )
+        config_conflicts = true;
+
     if (contains(add(outputlist,""), output))
         UI::ChangeWidget (`id(`output), `Value, output);
     else
@@ -318,9 +337,6 @@ define symbol RearConfigDialog () {
     else
         config_conflicts = true;
 
-    if ( Rear::backup != "NETFS" && Rear::backup !=  "" )
-        config_conflicts = true;
-
 
     if (config_conflicts &&
         ! Popup::ContinueCancel ( _("Your rear configuration file contains options this YaST2 module cannot configure.\n"
@@ -328,8 +344,8 @@ define symbol RearConfigDialog () {
         return `abort;
 
 
-    // this flag ensures that the combox is correctly refilled
-    // when the USB/NFS combobox is changed
+    // this flag ensures that the combox is correctly 
+    // refilled when the USB/NFS combobox is changed
     boolean rebuild_combobox_flag = false;
 
     symbol ret = nil;
@@ -337,7 +353,7 @@ define symbol RearConfigDialog () {
     {
         if ( UI::QueryWidget(`id(`backup_type), `Value ) == "USB" && rebuild_combobox_flag==false)
         {
-           UI::ReplaceWidget(`id(`rp), `ComboBox (`id(`netfs_url), `opt(`notify, `hstretch), _("&Location"), usbpartitions));
+           UI::ReplaceWidget(`id(`rp), `ComboBox (`id(`netfs_url), `opt(`notify, `hstretch), _("&Location"), UsbPartitions()));
            rebuild_combobox_flag=true;
         }
 
@@ -347,22 +363,23 @@ define symbol RearConfigDialog () {
            rebuild_combobox_flag=false;
         }
 
+        // open run rear dialg, if usb boot medium is selected show a warning
         if ( ret == `runrear)
         {
 	   if ( "USB" != (string) UI::QueryWidget(`id(`output), `Value ) || 
-                Popup::ContinueCancel (_("Your USB media will be overwritten. Do you want to continue?" )))
+                Popup::ContinueCancel (_("Your USB medium will be overwritten. Do you want to continue?" )))
            {
                SaveConfig(modules_load, backup_prog_include);
-               Rear::Write ();
 	       RearRunDialog();
            }
         }
 
+
+        // handle advanced menu
         if (ret == `scanusb )
         {
-           usbpartitions=UsbTerms();
            if ( UI::QueryWidget(`id(`backup_type), `Value ) == "USB" )
-               UI::ChangeWidget (`id(`netfs_url), `Items, usbpartitions );
+               UI::ChangeWidget (`id(`netfs_url), `Items, UsbPartitions() );
         }
 
         if ( ret == `additionalModules)
