@@ -145,7 +145,7 @@ define list<string> KernelModulesDialog(list <string> modules)
 {
     // store original value of modules for the case that the users clicks cancel
     list <string> modules_sav = modules;
- 
+
     UI::OpenDialog(
                   `VBox(
                   `SelectionBox( `id(`mods), _("Additional Kernel Modules for Rescue System"), modules ),
