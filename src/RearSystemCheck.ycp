@@ -46,7 +46,20 @@ import "Storage";
 
 define string SystemCheckBootloader()
 {
-    return nil;
+  if (FileUtils::Exists ("/etc/sysconfig/bootloader"))
+  {
+      string loader_type = (string) SCR::Read (.sysconfig.bootloader.LOADER_TYPE);
+      if (loader_type == nil)
+          return _("Cannot figure out which bootloader you are using.");
+      if (loader_type != "grub")
+          return sformat (_("You are using \"%1\" bootloader, which is not supported."), loader_type );
+  }
+  else
+  {
+      return _("Cannot figure out which bootloader you are using.");
+  }
+
+  return nil;
 }
 
 /*
