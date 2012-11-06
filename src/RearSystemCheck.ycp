@@ -37,13 +37,36 @@ textdomain "rear";
 import "FileUtils";
 import "Storage";
 
+/*
+ * check filesystems
+ * returns error message if system is not supported
+*/
+define string SystemCheckFilesystem()
+{
+    string value = nil;
+    list<symbol> supported = [ `ext2, `ext3, `ext4, `tmpfs, `swap, `none, `nfs, `nfs4 ];
+
+    map<string, map> storage = Storage::GetTargetMap();
+
+    foreach (string device, map devicemap, storage , {
+       list <map> parts = devicemap["partitions"]:[];
+       foreach (map part, parts , {
+          string dev = part["device"]:"";
+
+          // check partitions
+          if ( ! contains(supported, part["used_fs"]:`none) )
+              value = sformat(_("Device %1 uses an unsupported filesystem (%2)."), dev, part["used_fs"]:`none) ;
+       });
+    });
+    return value;
+}
+
 
 
 /*
  * check bootloader
  * returns error message if system is not supported
 */
-
 define string SystemCheckBootloader()
 {
   if (FileUtils::Exists ("/etc/sysconfig/bootloader"))
@@ -87,13 +110,13 @@ define string SystemCheckDisk()
 
           // check partitions
           if ( part["mountby"]:`none == `uuid )
-              value = sformat("Device %1 is mounted by uuid.", dev );
+              value = sformat(_("Device %1 is mounted by uuid."), dev );
 
           if ( part["type"]:`none == `CT_MULTIPATH )
-              value = sformat("Device %1 is multipath.", dev );
+              value = sformat(_("Device %1 is multipath."), dev );
 
           if ( contains ( [`reiserfs] , part["used_fs"]:`none  ))
-              value = sformat("Device %1 has unsupported filesystem. ", dev );
+              value = sformat(_("Device %1 has unsupported filesystem."), dev );
        });
 
      });
@@ -115,6 +138,10 @@ global define string SystemCheck()
         return ret;
 
     ret = SystemCheckBootloader();
+    if ( ret != nil )
+        return ret;
+
+    ret = SystemCheckFilesystem();
     if ( ret != nil )
         return ret;
 

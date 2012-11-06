@@ -125,7 +125,7 @@ global define boolean ReadSysconfig ()
 	if (netfs_url == nil)
 	    netfs_url = "";
 
-	string netfs_keep_old_backup_tmp = (string) SCR::Read (.sysconfig.rear.NETFS_KEEP_OLD_BACKUP);
+	string netfs_keep_old_backup_tmp = (string) SCR::Read (.sysconfig.rear.NETFS_KEEP_OLD_BACKUP_COPY);
 	if ( netfs_keep_old_backup_tmp == "no" || netfs_keep_old_backup_tmp == "n"  )
 	    netfs_keep_old_backup = false;
         else
@@ -170,9 +170,9 @@ global define boolean Write ()
 
     if (netfs_keep_old_backup != nil)
         if ( netfs_keep_old_backup )
-	    SCR::Write (.sysconfig.rear.NETFS_KEEP_OLD_BACKUP, "yes" );
+	    SCR::Write (.sysconfig.rear.NETFS_KEEP_OLD_BACKUP_COPY, "yes" );
         else
-	    SCR::Write (.sysconfig.rear.NETFS_KEEP_OLD_BACKUP, "no" );
+	    SCR::Write (.sysconfig.rear.NETFS_KEEP_OLD_BACKUP_COPY, "no" );
 
     if (modules_load != [])
 	SCR::Write (.sysconfig.rear.MODULES_LOAD, YCPListToRearList(modules_load));
