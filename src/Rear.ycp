@@ -102,7 +102,9 @@ define list<string> RearListToYCPList ( string rearlist ) {
  * Convert YCP List to Format for Config File
 */
 define string YCPListToRearList ( list<string> ycplist ) {
-    return "(" + mergestring (ycplist, " " ) + ")";
+    list <string> escaped = [];
+    foreach (string elem, ycplist, { escaped = add(escaped, mergestring(splitstring(elem," "),"\\ " )); });
+    return "(" + mergestring (escaped, " " ) + ")";
 }
 
 /**
