@@ -112,11 +112,11 @@ define string SystemCheckDisk()
           if ( part["mountby"]:`none == `uuid )
               value = sformat(_("Device %1 is mounted by uuid."), dev );
 
-          if ( part["type"]:`none == `CT_MULTIPATH )
+          if ( part["type"]:`none == `CT_DMMULTIPATH )
               value = sformat(_("Device %1 is multipath."), dev );
 
           if ( contains ( [`reiserfs] , part["used_fs"]:`none  ))
-              value = sformat(_("Device %1 has unsupported filesystem."), dev );
+              value = sformat(_("Device %1 contains an unsupported filesystem."), dev );
        });
 
      });

@@ -429,10 +429,19 @@ define symbol RearSequence () {
 
     string system_check_message = RearSystemCheck::SystemCheck();
 
-    if ( system_check_message != nil &&
-        ! Popup::ContinueCancel ( _("This system is not supported.") +"\n" +system_check_message +"\n"+
-                                  _("Do you want to continue anyways?" )))
-        return `abort;
+    if ( system_check_message != nil)
+    { 
+        y2warning(sformat("This system is not supported by rear! (%1)", system_check_message));
+        if  ( Popup::ContinueCancel ( _("This system is not supported.") +"\n" +system_check_message +"\n"+
+                                   _("Do you want to continue anyways?" )))
+        {
+            y2warning("It was the user's decision to use rear although this system is not supported.");
+        }
+        else
+        {
+            return `abort;
+        }
+    }
 
     Progress::NextStage();
 
