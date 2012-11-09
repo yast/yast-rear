@@ -86,12 +86,33 @@ global define map<string,string> GetUsbPartitions ()
 */
 define list<string> RearListToYCPList ( string rearlist ) {
     list<string> ycplist = [];
+    list<string> ycplisttmp = [];
 
     if (rearlist == nil)
         return [];
 
+    // remove brakets
     rearlist = regexpsub (rearlist, "^ *\\((.*)\\) *$", "\\1");
-    ycplist = splitstring (rearlist, " ");
+
+    // split string seperated by spaces into a string list, respect backslash escaped blanks
+    ycplisttmp = splitstring (rearlist, " ");
+    string buffer = "";
+    foreach (string elem, ycplisttmp,
+    {
+        integer length = size(elem);
+        if ( substring(elem, length-1, 1) == "\\" )
+        {
+             buffer = buffer + substring(elem, 0, length - 1) + " ";
+        }
+        else
+        {
+             buffer = buffer + elem;
+	     ycplist = add ( ycplist, buffer);
+             buffer = "";
+        }
+    });
+
+    // remove empty elements
     ycplist = filter (string element, ycplist, { return (element != ""); });
 
     return ycplist;
@@ -103,6 +124,7 @@ define list<string> RearListToYCPList ( string rearlist ) {
 */
 define string YCPListToRearList ( list<string> ycplist ) {
     list <string> escaped = [];
+    // escape blanks in directories with a backslash
     foreach (string elem, ycplist, { escaped = add(escaped, mergestring(splitstring(elem," "),"\\ " )); });
     return "(" + mergestring (escaped, " " ) + ")";
 }
