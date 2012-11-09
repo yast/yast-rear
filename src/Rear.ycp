@@ -137,30 +137,30 @@ global define boolean ReadSysconfig ()
 {
     if (FileUtils::Exists ("/etc/rear/local.conf"))
     {
-	backup = (string) SCR::Read (.sysconfig.rear.BACKUP);
+	backup = (string) SCR::Read(.etc.rear_conf.v.BACKUP);
 	if (backup == nil)
 	    backup = "";
 
-	output = (string) SCR::Read (.sysconfig.rear.OUTPUT);
+	output = (string) SCR::Read (.etc.rear_conf.v.OUTPUT);
 	if (output == nil)
 	    output = "";
 
-	netfs_url = (string) SCR::Read (.sysconfig.rear.NETFS_URL);
+	netfs_url = (string) SCR::Read (.etc.rear_conf.v.NETFS_URL);
 	if (netfs_url == nil)
 	    netfs_url = "";
 
 
         // rear interprets all non-empty values as yes
-	string netfs_keep_old_backup_tmp = (string) SCR::Read (.sysconfig.rear.NETFS_KEEP_OLD_BACKUP_COPY);
+	string netfs_keep_old_backup_tmp = (string) SCR::Read (.etc.rear_conf.v.NETFS_KEEP_OLD_BACKUP_COPY);
 	if ( netfs_keep_old_backup_tmp != "" && netfs_keep_old_backup_tmp != nil  )
 	    netfs_keep_old_backup = true;
         else
 	    netfs_keep_old_backup = false;
 
-	string modules_load_tmp = (string) SCR::Read (.sysconfig.rear.MODULES_LOAD);
+	string modules_load_tmp = (string) SCR::Read (.etc.rear_conf.v.MODULES_LOAD);
         modules_load = RearListToYCPList( modules_load_tmp);
 
-	string backup_prog_include_tmp = (string) SCR::Read (.sysconfig.rear.BACKUP_PROG_INCLUDE);
+	string backup_prog_include_tmp = (string) SCR::Read (.etc.rear_conf.v.BACKUP_PROG_INCLUDE);
         backup_prog_include = RearListToYCPList( backup_prog_include_tmp);
 
 	return true;
@@ -186,27 +186,27 @@ global define boolean Write ()
     if (!modified)
 	return true;
 
-    SCR::Write (.sysconfig.rear.BACKUP, "NETFS");
+    SCR::Write (.etc.rear_conf.v.BACKUP, "NETFS");
 
     if (output != "")
-	SCR::Write (.sysconfig.rear.OUTPUT, output);
+	SCR::Write (.etc.rear_conf.v.OUTPUT, output);
 
     if (netfs_url != "")
-	SCR::Write (.sysconfig.rear.NETFS_URL, netfs_url);
+	SCR::Write (.etc.rear_conf.v.NETFS_URL, netfs_url);
 
     if (netfs_keep_old_backup != nil)
         if ( netfs_keep_old_backup )
-	    SCR::Write (.sysconfig.rear.NETFS_KEEP_OLD_BACKUP_COPY, "yes" );
+	    SCR::Write (.etc.rear_conf.v.NETFS_KEEP_OLD_BACKUP_COPY, "yes" );
         else
-	    SCR::Write (.sysconfig.rear.NETFS_KEEP_OLD_BACKUP_COPY, "" );
+	    SCR::Write (.etc.rear_conf.v.NETFS_KEEP_OLD_BACKUP_COPY, "" );
 
     if (modules_load != [])
-	SCR::Write (.sysconfig.rear.MODULES_LOAD, YCPListToRearList(modules_load));
+	SCR::Write (.etc.rear_conf.v.MODULES_LOAD, YCPListToRearList(modules_load));
 
     if (backup_prog_include != [])
-	SCR::Write (.sysconfig.rear.BACKUP_PROG_INCLUDE, YCPListToRearList(backup_prog_include));
+	SCR::Write (.etc.rear_conf.v.BACKUP_PROG_INCLUDE, YCPListToRearList(backup_prog_include));
 
-    SCR::Write (.sysconfig.rear, nil);
+    SCR::Write (.etc.rear_conf, nil);
 
     return true;
 }
