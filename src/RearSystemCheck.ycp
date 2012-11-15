@@ -113,7 +113,7 @@ define list <string> SystemCheckDisk()
           if ( ! contains(supportedfs, part["used_fs"]:`none) )
           {
              y2error( sformat("Not supported by rear: Partition %1 uses an unsupported filesystem (%2).", dev, part["used_fs"]:`none)) ;
-             unsupported=add(unsupported,sformat(_("Partition %1 uses an unsupported filesystem (%2)."), dev, part["udes_fs"]:`none));
+             unsupported=add(unsupported,sformat(_("Partition %1 uses an unsupported filesystem (%2)."), dev, part["used_fs"]:`none));
           }
 
        });
