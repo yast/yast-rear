@@ -70,6 +70,51 @@ define list<term> UsbPartitions( )
 }
 
 /**
+ * Dialog shown, when system is not supported by rear
+ */
+define symbol UnsupportedDialog(list <string> messages)
+{
+    string message =  _("This system is not supported by rear, because:") +
+	              "<ul><li>" + mergestring(messages,"</li><li>") + "</li><ul>";
+
+    UI::OpenDialog(`opt(`decorated),
+    `HBox(`HSpacing(1.5), //`VSpacing(18),
+    `VBox(
+        `HSpacing(50),
+        `VSpacing(0.5),
+        `Label(_("This system is not supported by rear.")),
+        `VSpacing(0.5),
+        `ReplacePoint(`id(`rp), 
+           `VBox(
+               `PushButton(`id(`details ), _( "&Details" ) )
+                )
+        ),
+        `VSpacing(0.5),
+        `ButtonBox(
+             `PushButton(`id(`ok    ), _( "&Ignore and continue." ) ),
+             `PushButton(`id(`cancel), _( "&Cancel" ) )
+             ),
+        `VSpacing(0.5)),
+    `HSpacing(1.5)
+    ));
+
+    symbol ret=nil;
+    do {
+	ret = (symbol) UI::UserInput();
+
+        if ( ret == `details )
+        {
+            UI::ReplaceWidget(`id(`rp), `VBox(`RichText(message)));
+            UI::RecalcLayout();
+        }
+    }
+    while (ret != `ok && ret != `cancel );
+
+    UI::CloseDialog();
+    return ret;
+}
+
+/**
  * Dialog to Choose Directories
  */
 define list<string> DirectoriesDialog(list <string> directories)
@@ -427,18 +472,18 @@ define symbol RearSequence () {
 
     Progress::NextStage();
 
-    string system_check_message = RearSystemCheck::SystemCheck();
+    list <string> system_check_messages = RearSystemCheck::SystemCheck();
 
-    if ( system_check_message != nil)
+    if ( system_check_messages != [])
     { 
-        y2warning(sformat("This system is not supported by rear! (%1)", system_check_message));
-        if  ( Popup::ContinueCancel ( _("This system is not supported.") +"\n" +system_check_message +"\n"+
-                                   _("Do you want to continue anyways?" )))
+        y2error("This system is not supported by rear!");
+        if ( UnsupportedDialog(system_check_messages) == `ok )
         {
-            y2warning("It was the user's decision to use rear although this system is not supported.");
+            y2error("It was the user's decision to use rear although this system is not supported.");
         }
         else
         {
+            y2error("User decided to quit yast2-rear because this system is not suported.");
             return `abort;
         }
     }

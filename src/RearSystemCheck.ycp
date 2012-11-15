@@ -37,52 +37,37 @@ textdomain "rear";
 import "FileUtils";
 import "Storage";
 
-/*
- * check filesystems
- * returns error message if system is not supported
-*/
-define string SystemCheckFilesystem()
-{
-    string value = nil;
-    list<symbol> supported = [ `ext2, `ext3, `ext4, `tmpfs, `swap, `none, `nfs, `nfs4 ];
-
-    map<string, map> storage = Storage::GetTargetMap();
-
-    foreach (string device, map devicemap, storage , {
-       list <map> parts = devicemap["partitions"]:[];
-       foreach (map part, parts , {
-          string dev = part["device"]:"";
-
-          // check partitions
-          if ( ! contains(supported, part["used_fs"]:`none) )
-              value = sformat(_("Device %1 uses an unsupported filesystem (%2)."), dev, part["used_fs"]:`none) ;
-       });
-    });
-    return value;
-}
-
-
 
 /*
  * check bootloader
  * returns error message if system is not supported
 */
-define string SystemCheckBootloader()
+define list<string> SystemCheckBootloader()
 {
+  list <string> unsupported = [];
+
   if (FileUtils::Exists ("/etc/sysconfig/bootloader"))
   {
       string loader_type = (string) SCR::Read (.sysconfig.bootloader.LOADER_TYPE);
       if (loader_type == nil)
-          return _("Cannot figure out which bootloader you are using.");
+      {
+           y2error("Not supported by rear: Cannot figure out which bootloader is used.");
+           unsupported=add(unsupported,_("Cannot figure out which bootloader is used."));
+      }
       if (loader_type != "grub")
-          return sformat (_("You are using \"%1\" bootloader, which is not supported."), loader_type );
+      {
+           y2error(sformat("Not supported by rear: bootloader %1 is used.", loader_type));
+           unsupported=add(unsupported,sformat(_("Bootloader %1 is used."), loader_type));
+      }
+
   }
   else
   {
-      return _("Cannot figure out which bootloader you are using.");
+      y2error("Not supported by rear: Cannot figure out which bootloader is used.");
+      unsupported=add(unsupported,_("Cannot figure out which bootloader is used."));
   }
 
-  return nil;
+  return unsupported;
 }
 
 /*
@@ -93,16 +78,26 @@ define string SystemCheckBootloader()
  *  - filesystem
  * returns error message if system is not supported, otherwise nil
 */
-define string SystemCheckDisk()
+define list <string> SystemCheckDisk()
 {
-    string value = nil;
- 
+
     map<string, map> storage = Storage::GetTargetMap();
+    list<symbol> supportedfs = [ `ext2, `ext3, `ext4, `tmpfs, `swap, `none, `nfs, `nfs4 ];
+    list <string> unsupported = [];
 
     foreach (string device, map devicemap, storage , {
        // check devices
        if ( devicemap["transport"]:`none == `iscsi  )
-            value = sformat(_("Device %1 uses iscsi."), device );
+       {
+           y2error( sformat("Not supported by rear: Device %1 is iscsi.", device ));
+           unsupported=add(unsupported,sformat(_("Device %1 is iscsi."), device));
+       }
+
+       if ( devicemap["type"]:`none == `CT_DMMULTIPATH )
+       {
+           y2error( sformat("Not supported by rear: Device %1 is multipath.", device ));
+           unsupported=add(unsupported,sformat(_("Device %1 is multipath."), device));
+       }
 
        list <map> parts = devicemap["partitions"]:[];
        foreach (map part, parts , {
@@ -110,18 +105,28 @@ define string SystemCheckDisk()
 
           // check partitions
           if ( part["mountby"]:`none == `uuid )
-              value = sformat(_("Device %1 is mounted by uuid."), dev );
+          {
+             y2error( sformat("Not supported by rear: Partition %1 is mounted by uuid.", dev ));
+             unsupported=add(unsupported,sformat(_("Partition %1 is mounted by uuid."), dev));
+          }
 
-          if ( part["type"]:`none == `CT_DMMULTIPATH )
-              value = sformat(_("Device %1 is multipath."), dev );
+          if ( ! contains(supportedfs, part["used_fs"]:`none) )
+          {
+             y2error( sformat("Not supported by rear: Partition %1 uses an unsupported filesystem (%2).", dev, part["used_fs"]:`none)) ;
+             unsupported=add(unsupported,sformat(_("Partition %1 uses an unsupported filesystem (%2)."), dev, part["udes_fs"]:`none));
+          }
 
-          if ( contains ( [`reiserfs] , part["used_fs"]:`none  ))
-              value = sformat(_("Device %1 contains an unsupported filesystem."), dev );
        });
 
      });
-    return value;
+
+    return unsupported;
 }
+
+
+
+
+
 
 /*
  * runs all system checks
@@ -129,23 +134,14 @@ define string SystemCheckDisk()
  * returns error message if system is not supported, otherwise nil
 */
 
-global define string SystemCheck()
+global define list <string> SystemCheck()
 {
-    string ret =  nil;
+    list <string> unsupported = [];
 
-    ret = SystemCheckDisk();
-    if ( ret != nil )
-        return ret;
+    unsupported = (list<string>) merge(unsupported, SystemCheckDisk());
+    unsupported = (list<string>) merge(unsupported, SystemCheckBootloader());
 
-    ret = SystemCheckBootloader();
-    if ( ret != nil )
-        return ret;
-
-    ret = SystemCheckFilesystem();
-    if ( ret != nil )
-        return ret;
-
-    return nil;
+    return unsupported;
 }
 
 
