@@ -1,0 +1,24 @@
+/**
+ * File:
+ *   cfg_rear.scr
+ * Summary:
+ *   SCR Agent for reading/writing /etc/rear/local.conf
+ *   using the sysconfig-agent
+ *
+ * $Id$
+ *
+ * Read/Sets the values defined in <tt>/etc/rear/local.conf</tt>
+ * in an easy manner.
+ */
+.etc.rear_conf
+
+`ag_ini(
+    `IniAgent( "/etc/rear/local.conf",
+    $[ "options" : ["global_values"],
+       "comments" : [ "^#.*", "^[ \t]*$", ],
+       "params" : [
+         $[ "match" : [ "^[ \t]*([a-zA-Z0-9_]+)=(.*[^ \t]|)[ \t]*$", "%s=%s", ]
+         ]
+       ]
+    ]))
+
