@@ -55,7 +55,7 @@ include "rear/ui.ycp";
  * (currently only "port" key is expected)
  * @return boolean true on success
  */
-define boolean RearChangeConfiguration (map options ) {
+boolean RearChangeConfiguration (map options ) {
 
     string port = options["port"]:"";
     if (port != "")
