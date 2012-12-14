@@ -45,7 +45,7 @@ import "Progress";
 /**
  * returns currently loaded kernel modules 
  */
-define list<term> UsedModules()
+list<term> UsedModules()
 {
     list<term> modules = [];
 
@@ -61,7 +61,7 @@ define list<term> UsedModules()
 /*
  * returns availible partitions on usb media
  */ 
-define list<term> UsbPartitions( )
+list<term> UsbPartitions( )
 {
     return maplist(string name, string text, Rear::GetUsbPartitions(),
     {
@@ -72,7 +72,7 @@ define list<term> UsbPartitions( )
 /**
  * Dialog shown, when system is not supported by rear
  */
-define symbol UnsupportedDialog(list <string> messages)
+symbol UnsupportedDialog(list <string> messages)
 {
     string message =  _("This system is not supported by rear, because:") +
 	              "<ul><li>" + mergestring(messages,"</li><li>") + "</li><ul>";
@@ -117,7 +117,7 @@ define symbol UnsupportedDialog(list <string> messages)
 /**
  * Dialog to Choose Directories
  */
-define list<string> DirectoriesDialog(list <string> directories)
+list<string> DirectoriesDialog(list <string> directories)
 {
     // store original value of directories for the case that the users clicks cancel
     list <string> directories_sav = directories;
@@ -169,7 +169,7 @@ define list<string> DirectoriesDialog(list <string> directories)
     return directories;
 }
 
-define boolean SaveConfig ( list<string> modules_load, list<string> backup_prog_include )
+boolean SaveConfig ( list<string> modules_load, list<string> backup_prog_include )
 {
     Rear::modified		= true;
     Rear::output		= (string) UI::QueryWidget(`id(`output), `Value );
@@ -186,7 +186,7 @@ define boolean SaveConfig ( list<string> modules_load, list<string> backup_prog_
 /**
  * Dialog to Choose Kernel Modules
  */
-define list<string> KernelModulesDialog(list <string> modules)
+list<string> KernelModulesDialog(list <string> modules)
 {
     // store original value of modules for the case that the users clicks cancel
     list <string> modules_sav = modules;
@@ -244,7 +244,7 @@ define list<string> KernelModulesDialog(list <string> modules)
 /**
  * Dialog to run rear
  */
-define symbol RearRunDialog () {
+symbol RearRunDialog () {
 
     UI::OpenDialog(`opt(`decorated),
     `HBox(`HSpacing(1.5), `VSpacing(18),
@@ -296,7 +296,7 @@ define symbol RearRunDialog () {
 /**
  * Dialog for setup up Rear
  */
-define symbol RearConfigDialog () {
+symbol RearConfigDialog () {
 
     // For translators: Caption of the dialog
     string caption = _("Rear Configuration");
@@ -340,6 +340,7 @@ define symbol RearConfigDialog () {
 		`VSpacing (0.5),
                 `ReplacePoint(`id(`rp), `ComboBox (`id(`netfs_url), `opt(`notify, `hstretch, `editable), _("&Location"), netfs_url)),
 		`VSpacing (0.5),
+// FIXME usually, we allign checkboxes to the left
 		`CheckBox (`id(`netfs_keep_old_backup), `opt(`notify), _("&Keep old backup"), netfs_keep_old_backup),
 		`VSpacing (0.5)
 	    ), `HSpacing ()
@@ -363,6 +364,8 @@ define symbol RearConfigDialog () {
     if ( Rear::backup != "NETFS" && Rear::backup !=  "" )
         config_conflicts = true;
 
+// FIXME this leads to YComboBox Boot Media has no item with ID "" error if  output is ""
+// you are changing the value of widget, but in original outputlist used for ComboBox there's no ""
     if (contains(add(outputlist,""), output))
         UI::ChangeWidget (`id(`output), `Value, output);
     else
@@ -448,7 +451,7 @@ define symbol RearConfigDialog () {
 /**
  * The whole sequence
  */
-define symbol RearSequence () {
+symbol RearSequence () {
 
     Wizard::OpenOKDialog ();
     Wizard::SetDesktopTitle( _("Rear Configuration") );
@@ -476,14 +479,14 @@ define symbol RearSequence () {
 
     if ( system_check_messages != [])
     { 
-        y2error("This system is not supported by rear!");
+        y2warning ("This system is not supported by rear!");
         if ( UnsupportedDialog(system_check_messages) == `ok )
         {
-            y2error("It was the user's decision to use rear although this system is not supported.");
+            y2milestone ("It was the user's decision to use rear although this system is not supported.");
         }
         else
         {
-            y2error("User decided to quit yast2-rear because this system is not suported.");
+            y2milestone ("User decided to quit yast2-rear because this system is not suported.");
             return `abort;
         }
     }

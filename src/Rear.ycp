@@ -54,7 +54,7 @@ global map<string,string> usbpartitions = $[];
  * Returns a Map of Partitons on USB Volumes
  *
 */
-global define map<string,string> GetUsbPartitions ()
+global map<string,string> GetUsbPartitions ()
 {
     list<string> usbdevs = [];
     map <string, string> usbparts = $[];
@@ -84,7 +84,7 @@ global define map<string,string> GetUsbPartitions ()
 /*
  * Convert List from Config File to YCP List
 */
-define list<string> RearListToYCPList ( string rearlist ) {
+list<string> RearListToYCPList ( string rearlist ) {
     list<string> ycplist = [];
     list<string> ycplisttmp = [];
 
@@ -122,7 +122,7 @@ define list<string> RearListToYCPList ( string rearlist ) {
 /*
  * Convert YCP List to Format for Config File
 */
-define string YCPListToRearList ( list<string> ycplist ) {
+string YCPListToRearList ( list<string> ycplist ) {
     list <string> escaped = [];
     // escape blanks in directories with a backslash
     foreach (string elem, ycplist, { escaped = add(escaped, mergestring(splitstring(elem," "),"\\ " )); });
@@ -133,7 +133,7 @@ define string YCPListToRearList ( list<string> ycplist ) {
  * Read rear settings from /etc/rear/local.conf
  * returns true when file exists
  */
-global define boolean ReadSysconfig ()
+global boolean ReadSysconfig ()
 {
     if (FileUtils::Exists ("/etc/rear/local.conf"))
     {
@@ -171,7 +171,7 @@ global define boolean ReadSysconfig ()
 /**
  * Read all rear settings
  */
-global define boolean Read ()
+global boolean Read ()
 {
     GetUsbPartitions ();
     ReadSysconfig ();
@@ -181,7 +181,7 @@ global define boolean Read ()
 /**
  * Write all rear settings
  */
-global define boolean Write ()
+global boolean Write ()
 {
     if (!modified)
 	return true;
@@ -209,6 +209,9 @@ global define boolean Write ()
     SCR::Write (.etc.rear_conf, nil);
 
     return true;
+// FIXME shouldn't this return other value than just true? can writing fail? If it fails, please report an error
+
+// FIXME usually, direct SCR calls are in separate functions, and those are called from Write. But this is just cosmetic
 }
 
 /* EOF */

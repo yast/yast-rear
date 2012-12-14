@@ -42,7 +42,7 @@ import "Storage";
  * check bootloader
  * returns error message if system is not supported
 */
-define list<string> SystemCheckBootloader()
+list<string> SystemCheckBootloader()
 {
   list <string> unsupported = [];
 
@@ -78,7 +78,7 @@ define list<string> SystemCheckBootloader()
  *  - filesystem
  * returns error message if system is not supported, otherwise nil
 */
-define list <string> SystemCheckDisk()
+list <string> SystemCheckDisk()
 {
 
     map<string, map> storage = Storage::GetTargetMap();
@@ -134,7 +134,7 @@ define list <string> SystemCheckDisk()
  * returns error message if system is not supported, otherwise nil
 */
 
-global define list <string> SystemCheck()
+global list <string> SystemCheck()
 {
     list <string> unsupported = [];
 
