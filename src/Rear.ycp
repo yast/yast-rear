@@ -209,6 +209,9 @@ global boolean Write ()
     SCR::Write (.etc.rear_conf, nil);
 
     return true;
+// FIXME shouldn't this return other value than just true? can writing fail? If it fails, please report an error
+
+// FIXME usually, direct SCR calls are in separate functions, and those are called from Write. But this is just cosmetic
 }
 
 /* EOF */
