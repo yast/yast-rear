@@ -340,6 +340,7 @@ define symbol RearConfigDialog () {
 		`VSpacing (0.5),
                 `ReplacePoint(`id(`rp), `ComboBox (`id(`netfs_url), `opt(`notify, `hstretch, `editable), _("&Location"), netfs_url)),
 		`VSpacing (0.5),
+// FIXME usually, we allign checkboxes to the left
 		`CheckBox (`id(`netfs_keep_old_backup), `opt(`notify), _("&Keep old backup"), netfs_keep_old_backup),
 		`VSpacing (0.5)
 	    ), `HSpacing ()
@@ -363,6 +364,8 @@ define symbol RearConfigDialog () {
     if ( Rear::backup != "NETFS" && Rear::backup !=  "" )
         config_conflicts = true;
 
+// FIXME this leads to YComboBox Boot Media has no item with ID "" error if  output is ""
+// you are changing the value of widget, but in original outputlist used for ComboBox there's no ""
     if (contains(add(outputlist,""), output))
         UI::ChangeWidget (`id(`output), `Value, output);
     else
