@@ -61,20 +61,23 @@ global map<string,string> GetUsbPartitions ()
 
     map<string, map> storage = Storage::ReReadTargetMap();
 
-    foreach (string device, map devicemap, storage,
+    if ( storage != nil )
     {
-        if ( devicemap["transport"]:`none == `usb )
+        foreach (string device, map devicemap, storage,
         {
-            list <map> parts = devicemap["partitions"]:[];
-            foreach (map part, parts ,
+            if ( devicemap["transport"]:`none == `usb )
             {
-                string  dev = part["device"]:"";
-		integer size_k = part["size_k"]:0 ;
-                usbparts[sformat("usb://%1", dev)]=sformat ("%1 (%2)", dev, Storage::KByteToHumanString(size_k));
-            });
+                list <map> parts = devicemap["partitions"]:[];
+                foreach (map part, parts ,
+                {
+                    string  dev = part["device"]:"";
+		    integer size_k = part["size_k"]:0 ;
+                    usbparts[sformat("usb://%1", dev)]=sformat ("%1 (%2)", dev, Storage::KByteToHumanString(size_k));
+                });
 
-        }
-    });
+            }
+        });
+    }
     usbpartitions = usbparts;
     return usbparts;
 }
@@ -206,10 +209,7 @@ global boolean Write ()
     if (backup_prog_include != [])
 	SCR::Write (.etc.rear_conf.v.BACKUP_PROG_INCLUDE, YCPListToRearList(backup_prog_include));
 
-    SCR::Write (.etc.rear_conf, nil);
-
-    return true;
-// FIXME shouldn't this return other value than just true? can writing fail? If it fails, please report an error
+    return SCR::Write (.etc.rear_conf, nil);
 
 // FIXME usually, direct SCR calls are in separate functions, and those are called from Write. But this is just cosmetic
 }

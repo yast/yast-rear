@@ -41,6 +41,9 @@ import "Service";
 import "Wizard";
 import "Storage";
 import "Progress";
+import "Confirm";
+import "Package";
+import "Report";
 
 /**
  * returns currently loaded kernel modules 
@@ -75,21 +78,18 @@ list<term> UsbPartitions( )
 symbol UnsupportedDialog(list <string> messages)
 {
     string message =  _("This system is not supported by rear, because:") +
-	              "<ul><li>" + mergestring(messages,"</li><li>") + "</li><ul>";
+	              "<ul><li>" + mergestring(messages,"</li><li>") + "</li></ul><strong>" +
+                      _("Do NOT expect the created backup to be useful for system recovery if you ignore this warning.") +
+                      "</strong>";
 
     UI::OpenDialog(`opt(`decorated),
-    `HBox(`HSpacing(1.5), //`VSpacing(18),
+    `HBox(`HSpacing(1.5), 
     `VBox(
         `HSpacing(50),
         `VSpacing(0.5),
-        `Label(_("This system is not supported by rear.")),
+        `Label(_("This system is not supported.")),
         `VSpacing(0.5),
-        `ReplacePoint(`id(`rp), 
-           `VBox(
-               `PushButton(`id(`details ), _( "&Details" ) )
-                )
-        ),
-        `VSpacing(0.5),
+        `VBox(`RichText(message)),
         `ButtonBox(
              `PushButton(`id(`ok    ), _( "&Ignore and continue." ) ),
              `PushButton(`id(`cancel), _( "&Cancel" ) )
@@ -101,12 +101,6 @@ symbol UnsupportedDialog(list <string> messages)
     symbol ret=nil;
     do {
 	ret = (symbol) UI::UserInput();
-
-        if ( ret == `details )
-        {
-            UI::ReplaceWidget(`id(`rp), `VBox(`RichText(message)));
-            UI::RecalcLayout();
-        }
     }
     while (ret != `ok && ret != `cancel );
 
@@ -177,7 +171,11 @@ boolean SaveConfig ( list<string> modules_load, list<string> backup_prog_include
     Rear::netfs_keep_old_backup = (boolean) UI::QueryWidget(`id(`netfs_keep_old_backup), `Value );
     Rear::modules_load          = modules_load;
     Rear::backup_prog_include   = backup_prog_include;
-    Rear::Write ();
+    if (! Rear::Write () )
+    {
+	Popup::Error(_("Cannot write rear configuration file."));
+        return false;
+    }
 
     return true;
 }
@@ -252,6 +250,9 @@ symbol RearRunDialog () {
         `HSpacing(80),
         `VSpacing(0.5),
         `LogView (`id (`log), "Rear output:", 8, 0),
+        `VSpacing(0.5),
+        `ReplacePoint (`id (`rp), (`Label(_("Preparing for Rear Execution.")))),
+        `VSpacing(0.5),
         `PushButton (`id(`close), Label::CloseButton ()),
         `VSpacing(0.5)),
     `HSpacing(1.5)
@@ -259,32 +260,56 @@ symbol RearRunDialog () {
 
     UI::ChangeWidget (`id(`close), `Enabled, false);
 
-    string output  = "";
-    SCR::Execute (.background.run_output, "bash -c \"/usr/sbin/rear mkbackup; sleep 1\"");
+    if (!Package::Install ("rear"))
+    {
+        Report::Error (Message::CannotContinueWithoutPackagesInstalled ());
+        UI::CloseDialog();
+        return `close;
+    }
+
+
+    integer id = (integer) SCR::Execute (.process.start_shell, "/usr/sbin/rear mkbackup");
+    UI::ReplaceWidget (`id (`rp), `Label ( _("Running rear...")));
 
     symbol ret = nil;
     do
     {
         ret = (symbol) UI::PollInput();
 
-        if ((boolean) SCR::Read(.background.output_open) &&
-            (integer) SCR::Read(.background.newlines)>0)
+        if (SCR::Read(.process.running, id) != true)
         {
-            // read the output line from rear:
-            list out    = (list)SCR::Read(.background.newout);
-            output = out[0]:"";
-            if (output != "")
-                UI::ChangeWidget (`id(`log), `LastLine, output + "\n");
-        }
-        else if (!(boolean)SCR::Read(.background.output_open))
-        {
+            string buf     = (string) SCR::Read (.process.read, id);
+            string err_buf = (string) SCR::Read (.process.read_stderr, id);
+            if (buf != nil && buf != "")
+                UI::ChangeWidget (`id(`log), `LastLine, buf + "\n");
+            if (err_buf != nil && err_buf != "")
+                UI::ChangeWidget (`id(`log), `LastLine, err_buf + "\n");
+
+            integer status  = (integer) SCR::Read (.process.status, id);
+            if (status != 0)
+            {
+                 UI::ReplaceWidget (`id (`rp), `Label ( sformat( _("Execution failed with return value %1."), status )));
+            }
+            else
+            {
+                 UI::ReplaceWidget (`id (`rp), `Label ( _("Finished. You are strongly advised to test the created backup.")));
+            }
             UI::ChangeWidget (`id(`close), `Enabled, true);
             ret = (symbol) UI::UserInput();
         }
+        else
+        {
+             string line = (string)SCR::Read (.process.read_line, id);
+             if (line != nil && line != "")
+                 UI::ChangeWidget (`id(`log), `LastLine, line + "\n");
+             string err = (string)SCR::Read (.process.read_line_stderr, id);
+             if (err!= nil && err != "")
+                 UI::ChangeWidget (`id(`log), `LastLine, err + "\n");
+        }
+
         sleep (100);
     } while (ret != `close ); 
 
-    SCR::Execute(.background.kill);
     UI::CloseDialog();
     return ret;
 }
@@ -340,8 +365,7 @@ symbol RearConfigDialog () {
 		`VSpacing (0.5),
                 `ReplacePoint(`id(`rp), `ComboBox (`id(`netfs_url), `opt(`notify, `hstretch, `editable), _("&Location"), netfs_url)),
 		`VSpacing (0.5),
-// FIXME usually, we allign checkboxes to the left
-		`CheckBox (`id(`netfs_keep_old_backup), `opt(`notify), _("&Keep old backup"), netfs_keep_old_backup),
+		`Left(`CheckBox (`id(`netfs_keep_old_backup), `opt(`notify), _("&Keep old backup"), netfs_keep_old_backup)),
 		`VSpacing (0.5)
 	    ), `HSpacing ()
 	)),
@@ -364,10 +388,11 @@ symbol RearConfigDialog () {
     if ( Rear::backup != "NETFS" && Rear::backup !=  "" )
         config_conflicts = true;
 
-// FIXME this leads to YComboBox Boot Media has no item with ID "" error if  output is ""
-// you are changing the value of widget, but in original outputlist used for ComboBox there's no ""
-    if (contains(add(outputlist,""), output))
+    /* choose selected option or fallback to "ISO" if nothing is set */
+    if (contains(outputlist, output))
         UI::ChangeWidget (`id(`output), `Value, output);
+    else if (output == "")
+        UI::ChangeWidget (`id(`output), `Value, "ISO");
     else
         config_conflicts = true;
 
@@ -456,6 +481,13 @@ symbol RearSequence () {
     Wizard::OpenOKDialog ();
     Wizard::SetDesktopTitle( _("Rear Configuration") );
     Wizard::SetDesktopIcon("backup");
+
+    if (! Confirm::MustBeRoot () )
+    {
+        UI::CloseDialog ();
+        return `abort;
+    }
+
     Storage::InitLibstorage(true); // true: read-only
 
     /* Rear read dialog caption */
