@@ -91,7 +91,7 @@ symbol UnsupportedDialog(list <string> messages)
         `VSpacing(0.5),
         `VBox(`RichText(message)),
         `ButtonBox(
-             `PushButton(`id(`ok    ), _( "&Ignore and continue." ) ),
+             `PushButton(`id(`ok    ), _( "&Ignore and continue" ) ),
              `PushButton(`id(`cancel), _( "&Cancel" ) )
              ),
         `VSpacing(0.5)),
