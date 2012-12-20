@@ -327,8 +327,21 @@ symbol RearConfigDialog () {
     string caption = _("Rear Configuration");
 
     // help text for Rear 
-    string help = _("<p>Here, configure Rear Relax and Recover backup for your computer.</p>") +
-    _("<p>.</p>");
+    string help = _("<p>Configure Rear Relax and Recover (<b>ReaR</b>) backup for your computer.</p>") +
+    _("<p>Decide how to start your <b>Recovery System</b>. Choose USB if you want to boot from an USB stick, or ISO for CD-ROM respectively.</p>")+
+
+    _("<p>Choose where the <b>Backup</b> should be stored. Select NFS if you have to use a server that offers Network File System. Please specify the location as follows: <tt>nfs://hostname/directory</tt>. You can also choose USB to store your backup on an USB stick or USB disk.</p>")+
+
+    _("<p>If no USB devices are shown, attach an USB stick or an USB disk and click <b>Rescan USB Devices</b>.</p>") +
+
+    _("<p>Select <b>Keep old backup</b> if you don't want the previous backup copy to be overwritten.</p>") +
+
+    _("<p>The <b>Advanced</b> menu offers to add <b>additional directories to the backup</b> and <b>additional kernel modules to the rescue system</b>. That's only useful if your backup doesn't contain all the needed directories or the rescue system doesn't boot due to missing kernel modules.</p>") +
+
+    _("<p>The <b>Save and run rear now</b> button runs rear and shows rear's output. <strong>Make sure to test if the created backup works as expected on your system!</strong></p>") +
+
+    _("<p><b>OK</b> saves the configuration and quits while <b>Cancel</b> closes the configuration dialog without saving.<p>");
+
 
     // get varibales from config
     list <string> netfs_url = [ Rear::netfs_url ];
@@ -344,8 +357,7 @@ symbol RearConfigDialog () {
 
     // prepare advanced menu
     list<term> expertMenu = [ `item(`id(`additionalDirs), _("Additional Directories in Backup" )) ,
-                              `item(`id(`additionalModules), _("Additional Kernel Modules in Rescue System" )),
-                              `item(`id(`scanusb), _("Rescan USB Devices")) ];
+                              `item(`id(`additionalModules), _("Additional Kernel Modules in Rescue System" )) ];
 
     // prepare main dialog
     term con = `HBox (`HSpacing (3), `VBox (
@@ -365,14 +377,17 @@ symbol RearConfigDialog () {
 		`VSpacing (0.5),
                 `ReplacePoint(`id(`rp), `ComboBox (`id(`netfs_url), `opt(`notify, `hstretch, `editable), _("&Location"), netfs_url)),
 		`VSpacing (0.5),
-		`Left(`CheckBox (`id(`netfs_keep_old_backup), `opt(`notify), _("&Keep old backup"), netfs_keep_old_backup)),
+                `HBox(
+		    `Left(`CheckBox (`id(`netfs_keep_old_backup), `opt(`notify), _("&Keep old backup"), netfs_keep_old_backup)),
+                    `PushButton(`id(`scanusb), _( "Rescan USB Devices") )
+                ),
 		`VSpacing (0.5)
 	    ), `HSpacing ()
 	)),
 	`VSpacing (0.5),
         `Right( `MenuButton( _("Advanced"), expertMenu )),
 	`VSpacing (0.5),
-        `PushButton(`id(`runrear    ), _( "Save and Run") ),
+        `PushButton(`id(`runrear), _( "Save and run rear now") ),
 	`VStretch ()
     ), `HSpacing(3));
 
@@ -448,13 +463,13 @@ symbol RearConfigDialog () {
         }
 
 
-        // handle advanced menu
         if (ret == `scanusb )
         {
            if ( UI::QueryWidget(`id(`backup_type), `Value ) == "USB" )
                UI::ChangeWidget (`id(`netfs_url), `Items, UsbPartitions() );
         }
 
+        // handle advanced menu
         if ( ret == `additionalModules)
             modules_load = KernelModulesDialog(modules_load);
 

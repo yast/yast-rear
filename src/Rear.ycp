@@ -205,13 +205,14 @@ global boolean Write ()
 
     if (modules_load != [])
 	SCR::Write (.etc.rear_conf.v.MODULES_LOAD, YCPListToRearList(modules_load));
+    else
+	SCR::Write (.etc.rear_conf.v.MODULES_LOAD, "");
 
     if (backup_prog_include != [])
 	SCR::Write (.etc.rear_conf.v.BACKUP_PROG_INCLUDE, YCPListToRearList(backup_prog_include));
 
     return SCR::Write (.etc.rear_conf, nil);
 
-// FIXME usually, direct SCR calls are in separate functions, and those are called from Write. But this is just cosmetic
 }
 
 /* EOF */
