@@ -206,7 +206,7 @@ global boolean Write ()
     if (modules_load != [])
 	SCR::Write (.etc.rear_conf.v.MODULES_LOAD, YCPListToRearList(modules_load));
     else
-	SCR::Write (.etc.rear_conf.v.MODULES_LOAD, "");
+	SCR::Write (.etc.rear_conf.v.MODULES_LOAD, "( )");
 
     if (backup_prog_include != [])
 	SCR::Write (.etc.rear_conf.v.BACKUP_PROG_INCLUDE, YCPListToRearList(backup_prog_include));

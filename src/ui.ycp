@@ -46,7 +46,7 @@ import "Package";
 import "Report";
 
 /**
- * returns currently loaded kernel modules 
+ * returns currently loaded kernel modules
  */
 list<term> UsedModules()
 {
@@ -57,13 +57,18 @@ list<term> UsedModules()
     list <string> mods = splitstring (output["stdout"]:"", " ");
 
     integer n=1;
-    foreach ( string mod, mods, { modules = add(modules, `item(`id(mod), sformat("%1. %2",n,mod ))); n=n+1; } );
-    return modules; 
+    foreach ( string mod, mods,
+    {
+	if ( mod != "" )
+       //     modules = add(modules, `item(`id(mod), sformat("%1. %2",n,mod ))); n=n+1;
+            modules = add(modules, `item(`id(mod), sformat("%1",mod ))); n=n+1;
+    } );
+    return modules;
 }
 
 /*
  * returns availible partitions on usb media
- */ 
+ */
 list<term> UsbPartitions( )
 {
     return maplist(string name, string text, Rear::GetUsbPartitions(),
@@ -117,20 +122,29 @@ list<string> DirectoriesDialog(list <string> directories)
     list <string> directories_sav = directories;
 
     UI::OpenDialog(
-                  `VBox(
-                  `SelectionBox( `id(`dirs), _("Additional Directories to Backup"), directories ),
-                  `HBox(
-                    `PushButton( `id(`adddir), Label::AddButton() ),
-                    `HSpacing(4),
-                    `PushButton( `id(`deldir), Label::DeleteButton() )
-                  ),
-
-                  `HBox(
-                      `PushButton(`id(`ok    ), _( "&OK"     ) ),
-                      `PushButton(`id(`cancel), _( "&Cancel" ) )
+                  `MinSize( 45, 15,
+                   `HBox(
+                    `HSpacing(1),
+                    `VBox(
+                     `VSpacing(0.5),
+                     `VBox(
+                      `SelectionBox( `id(`dirs), _("Additional Directories to Backup"), directories ),
+                      `HBox(
+                       `PushButton( `id(`adddir), Label::AddButton() ),
+                       `HSpacing(4),
+                       `PushButton( `id(`deldir), Label::DeleteButton() )
+                      ),
+                      `ButtonBox(
+                       `PushButton(`id(`ok    ), _( "&OK"     ) ),
+                       `PushButton(`id(`cancel), _( "&Cancel" ) )
+                      )
+                    ),
+                    `VSpacing(0.5)
+                   ),
+                  `HSpacing(1)
                   )
-
-              ));
+                 )
+                );
 
     symbol ret=nil;
     do
@@ -190,21 +204,34 @@ list<string> KernelModulesDialog(list <string> modules)
     list <string> modules_sav = modules;
 
     UI::OpenDialog(
-                  `VBox(
-                  `SelectionBox( `id(`mods), _("Additional Kernel Modules for Rescue System"), modules ),
-                  `HBox(
-                    `MinWidth(15, `ComboBox( `id(`newmod), `opt(`editable), "", UsedModules() ) ),
-                    `PushButton( `id(`addmod), Label::AddButton() ),
-                    `HSpacing(4),
-                    `PushButton( `id(`delmod), Label::DeleteButton() )
-                  ),
-
-                  `HBox(
-                      `PushButton(`id(`ok    ), _( "&OK"     ) ),
-                      `PushButton(`id(`cancel), _( "&Cancel" ) )
-                  )
-
-              ));
+                  `MinSize( 50, 20,
+                   `HBox(
+                    `HSpacing(1),
+                     `VBox(
+                      `VSpacing(1),
+                      `HBox(
+                       `SelectionBox( `id(`availablemods), _("Currently used kernel modules sorted by order they were loaded"), UsedModules() ),
+                       `VBox(
+                        `VStretch(),
+                        `PushButton( `id(`delmod), Label::DeleteButton() ),
+                        `PushButton( `id(`addmod), UI::Glyph(`ArrowRight) ),
+                        `VStretch(),
+                        `PushButton( `id(`up), UI::Glyph(`ArrowUp) ),
+                        `PushButton( `id(`down), UI::Glyph(`ArrowDown) ) ,
+                        `VStretch()
+                        ),
+                       `SelectionBox( `id(`mods), _("Additional Kernel Modules for Rescue System"), modules )
+                       ),
+                      `ButtonBox(
+                       `PushButton(`id(`ok    ), _( "&OK"     ) ),
+                       `PushButton(`id(`cancel), _( "&Cancel" ) )
+                      ),
+                      `VSpacing(1)
+                     ),
+                    `HSpacing(1)
+                    )
+                   )
+                  );
 
     symbol ret=nil;
     do
@@ -217,13 +244,40 @@ list<string> KernelModulesDialog(list <string> modules)
         }
         if ( ret == `addmod )
         {
-             string addelem = (string)UI::QueryWidget( `id(`newmod), `Value);
+             string addelem = (string)UI::QueryWidget( `id(`availablemods), `Value);
              if ( ! contains(modules,addelem) )
              {
                   modules = add(modules, addelem);
                   UI::ChangeWidget( `id(`mods), `Items, modules);
              }
+             UI::ChangeWidget( `id(`mods), `Value, addelem );
+
         }
+        if ( ret == `up || ret == `down )
+        {
+             string mod = (string)UI::QueryWidget( `id(`mods), `Value);
+             integer pos=0;
+             foreach (string tmpmod, modules, { if ( modules[pos]:"" == mod ) break; pos = pos +1; });
+
+             if (pos > 0 && ret == `up)
+             {
+                modules[pos] = modules[pos-1]:"";
+                modules[pos-1] = mod;
+             }
+
+             if (pos < size(modules)-1 && ret == `down)
+             {
+                modules[pos] = modules[pos+1]:"";
+                modules[pos+1] = mod;
+             }
+
+
+             UI::ChangeWidget( `id(`mods), `Items, modules);
+             UI::ChangeWidget( `id(`mods), `Value, mod );
+
+
+        }
+
         ret = (symbol) UI::UserInput();
 
     }
