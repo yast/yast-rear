@@ -205,12 +205,17 @@ list<string> KernelModulesDialog(list <string> modules)
 
     UI::OpenDialog(
                   `MinSize( 50, 20,
+
+
                    `HBox(
                     `HSpacing(1),
                      `VBox(
-                      `VSpacing(1),
+                      `VSpacing(0.5),
+                      `Label(`opt(`boldFont),_("Additional Kernel Modules")),
+                      `VSpacing(0.5),
                       `HBox(
-                       `SelectionBox( `id(`availablemods), _("Currently used kernel modules sorted by order they were loaded"), UsedModules() ),
+                       `MinWidth( 30,
+                       `SelectionBox( `id(`availablemods), _("Available Modules in current System:"), UsedModules() ) ),
                        `VBox(
                         `VStretch(),
                         `PushButton( `id(`delmod), Label::DeleteButton() ),
@@ -220,8 +225,10 @@ list<string> KernelModulesDialog(list <string> modules)
                         `PushButton( `id(`down), UI::Glyph(`ArrowDown) ) ,
                         `VStretch()
                         ),
-                       `SelectionBox( `id(`mods), _("Additional Kernel Modules for Rescue System"), modules )
+                       `MinWidth( 30,
+                       `SelectionBox( `id(`mods), _("Modules added to Rescue System:"), modules ) )
                        ),
+                      `Label(_("Modules are sorted in the order they are loaded.")),
                       `ButtonBox(
                        `PushButton(`id(`ok    ), _( "&OK"     ) ),
                        `PushButton(`id(`cancel), _( "&Cancel" ) )
