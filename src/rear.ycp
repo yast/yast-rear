@@ -57,13 +57,23 @@ include "rear/ui.ycp";
  */
 boolean RearChangeConfiguration (map options ) {
 
-    string port = options["port"]:"";
-    if (port != "")
+    string output = options["output"]:"";
+    string netfs_url = options["netfs_url"]:"";
+
+    if (output != "")
     {
-//	Rear::port	= port;
-	Rear::modified	= true;
+	Rear::output                = output;
+	Rear::modified	            = true;
 	return true;
     }
+
+    if (netfs_url != "")
+    {
+	Rear::netfs_url             = netfs_url;
+	Rear::modified	            = true;
+	return true;
+    }
+
     return false;
 }
 
@@ -84,14 +94,18 @@ map cmdline_description = $[
 	],
     ],
     "options"		: $[
-	"port"	:$[
-	    // command line help text for the 'port' option
-	    "help"	: _("Serial port"),
+	"output"	:$[
+	    "help"	: _("Output"),
+	    "type"	: "string"
+	],
+
+	"netfs_url"	:$[
+	    "help"	: _("Netfs URL"),
 	    "type"	: "string"
 	],
     ],
     "mappings"		: $[
-	"configure"	: [ "port" ],
+	"configure"	: [ "output", "netfs_url" ],
     ]
 ];
 
