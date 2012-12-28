@@ -228,7 +228,7 @@ list<string> KernelModulesDialog(list <string> modules)
                        `MinWidth( 30,
                        `SelectionBox( `id(`mods), _("Modules added to Rescue System:"), modules ) )
                        ),
-                      `Label(_("Modules are sorted in the order they are loaded.")),
+                      `Label(_("Modules are sorted in the order they were loaded.")),
                       `ButtonBox(
                        `PushButton(`id(`ok    ), _( "&OK"     ) ),
                        `PushButton(`id(`cancel), _( "&Cancel" ) )
