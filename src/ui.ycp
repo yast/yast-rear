@@ -465,7 +465,7 @@ symbol RearConfigDialog () {
     if ( Rear::backup != "NETFS" && Rear::backup !=  "" )
     {
         config_conflicts = true;
-        conflict_message = conflict_message + _("BACKUP is set to an unknown value.\n")
+        conflict_message = conflict_message + _("BACKUP is set to an unknown value.\n");
     }
 
     /* choose selected option or fallback to "ISO" if nothing is set */
