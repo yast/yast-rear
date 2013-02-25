@@ -458,11 +458,15 @@ symbol RearConfigDialog () {
 
     /* If config file was manually edited and config options are unknown we show a warning */
     boolean config_conflicts = false;
+    string conflict_message = "";
 
 
     /* set settings according to options read from config file. */
     if ( Rear::backup != "NETFS" && Rear::backup !=  "" )
+    {
+        conflict_message = conflict_message + _("BACKUP is set to an unknown value.\n");
         config_conflicts = true;
+    }
 
     /* choose selected option or fallback to "ISO" if nothing is set */
     if (contains(outputlist, output))
@@ -470,7 +474,10 @@ symbol RearConfigDialog () {
     else if (output == "")
         UI::ChangeWidget (`id(`output), `Value, "ISO");
     else
+    {
+        conflict_message = conflict_message + _("OUTPUT is set to an unknown value.\n");
         config_conflicts = true;
+    }
 
     string type = toupper(substring(Rear::netfs_url,0,3));
     if (contains(add(backup_type,""), type))
@@ -484,12 +491,15 @@ symbol RearConfigDialog () {
         }
     }
     else
+    {
+        conflict_message = conflict_message + _("NETFS_URL is set to an unknown value or in wrong format.\n");
         config_conflicts = true;
+    }
 
 
     if (config_conflicts &&
-        ! Popup::ContinueCancel ( _("Your rear configuration file contains options this YaST2 module cannot configure.\n"
-                                  "Do you want to continue and overwrite these settings?" )))
+        ! Popup::ContinueCancel ( _("Your rear configuration file contains options this YaST2 module cannot configure.\n" )  + conflict_message +
+                                  _("Do you want to continue and overwrite these settings?" )))
         return `abort;
 
 
