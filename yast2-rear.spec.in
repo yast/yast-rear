@@ -10,6 +10,8 @@ Requires:       yast2-storage
 
 BuildArchitectures:	noarch
 
+Requires:       yast2-ruby-bindings >= 1.0.0
+
 Summary:	YaST2 - Rear - Relax and Recover
 
 %description
@@ -28,7 +30,7 @@ The YaST2 component for configuring Rear - Relax and Recover Backup
 %defattr(-,root,root)
 %dir @yncludedir@/rear
 @yncludedir@/rear/*
-@clientdir@/rear.ycp
+@clientdir@/rear.rb
 @moduledir@/RearSystemCheck.*
 @moduledir@/Rear.*
 @desktopdir@/rear.desktop
