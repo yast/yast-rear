@@ -1,20 +1,22 @@
-# Makefile.am for rear/src
+# Sources for rear
+
+module_DATA = \
+  modules/RearSystemCheck.rb \
+  modules/Rear.rb
+
+client_DATA = \
+  clients/rear.rb
 
 yncludedir = @yncludedir@/rear
+ynclude_DATA = \
+  include/rear/ui.rb
 
-client_DATA =			\
-	rear.ycp
+scrconf_DATA = \
+  scrconf/rear_conf.scr
 
-ynclude_DATA =			\
-	ui.ycp
+desktop_DATA = \
+  desktop/rear.desktop
 
-desktop_DATA =			\
-	rear.desktop
-
-module_DATA =			\
-	Rear.ycp		\
-	RearSystemCheck.ycp
-
-EXTRA_DIST = $(client_DATA) $(ynclude_DATA) $(module_DATA) $(desktop_DATA)
+EXTRA_DIST = $(module_DATA) $(client_DATA) $(ynclude_DATA) $(scrconf_DATA) $(desktop_DATA)
 
 include $(top_srcdir)/Makefile.am.common
