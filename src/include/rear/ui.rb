@@ -50,7 +50,7 @@ module Yast
     def UsedModules
       modules = []
 
-      cmd = "lsmod | tail +2 | cut -d ' ' -f1 | tac | tr -s '[:space:]' ' '"
+      cmd = "lsmod | tail -n +2 | cut -d ' ' -f1 | tac | tr -s '[:space:]' ' '"
       output = Convert.to_map(SCR.Execute(path(".target.bash_output"), cmd, ""))
       mods = Builtins.splitstring(Ops.get_string(output, "stdout", ""), " ")
 
@@ -66,6 +66,23 @@ module Yast
         n = Ops.add(n, 1)
       end
       deep_copy(modules)
+    end
+
+    # returns a list of mountpoints that have to be included in BACKUP_PROG_INCLUDE
+    def GetMountpoints
+      # -D excludes pseudo filesystems
+      # -r raw output, no ascii-art
+      # -n no column header
+      cmd = "findmnt -D -t notmpfs,nodevtmpfs -o TARGET -n -r | sort"
+      output = SCR.Execute(path(".target.bash_output"), cmd, "")
+      mountpoints = output["stdout"].split(/\n/)
+
+      # Do not include /, /.snapshots and /var/crash
+      mountpoints.delete_if { |e|
+        %w(/ /.snapshots /var/crash).include?(e)
+      }
+
+      mountpoints.map {|e| e + "/*" }
     end
 
     # returns availible partitions on usb media
@@ -184,17 +201,90 @@ module Yast
       deep_copy(directories)
     end
 
-    def SaveConfig(modules_load, backup_prog_include)
-      modules_load = deep_copy(modules_load)
-      backup_prog_include = deep_copy(backup_prog_include)
-      Rear.modified = true
-      Rear.output = Convert.to_string(UI.QueryWidget(Id(:output), :Value))
-      Rear.netfs_url = Convert.to_string(UI.QueryWidget(Id(:netfs_url), :Value))
-      Rear.netfs_keep_old_backup = Convert.to_boolean(
-        UI.QueryWidget(Id(:netfs_keep_old_backup), :Value)
+    def ListEditDialog(title, list)
+      # store original list for the case that the users clicks cancel
+      list_sav = list
+
+      UI.OpenDialog(
+        MinSize(
+          45,
+          15,
+          HBox(
+            HSpacing(1),
+            VBox(
+              VSpacing(0.5),
+              VBox(
+                VSquash(
+                  HBox(
+                    TextEntry(Id(:program), Opt(:notify), _("&New Entry")),
+                    VBox(
+                      VSpacing(1),
+                      PushButton(Id(:additem), Label.AddButton)
+                    )
+                  )
+                ),
+                HBox(
+                  SelectionBox(
+                    Id(:list),
+                    title,
+                    list
+                  ),
+                  Top(
+                    VBox(
+                      VSpacing(1),
+                      PushButton(Id(:delitem), Label.DeleteButton)
+                    )
+                  )
+                ),
+                ButtonBox(
+                  PushButton(Id(:ok), _("&OK")),
+                  PushButton(Id(:cancel), _("&Cancel"))
+                )
+              ),
+              VSpacing(0.5)
+            ),
+            HSpacing(1)
+          )
+        )
       )
-      Rear.modules_load = deep_copy(modules_load)
-      Rear.backup_prog_include = deep_copy(backup_prog_include)
+
+      ret = nil
+      begin
+        if ret == :delitem
+          delelem = UI.QueryWidget(Id(:list), :CurrentItem)
+          list.delete_if { |elem| elem == delelem }
+          UI.ChangeWidget(Id(:list), :Items, list)
+        end
+        if ret == :additem
+          addelem = UI.QueryWidget(Id(:program), :Value)
+          if !Builtins.contains(list, addelem)
+            list = Builtins.add(list, addelem)
+            UI.ChangeWidget(Id(:list), :Items, list)
+          end
+        end
+        ret = Convert.to_symbol(UI.UserInput)
+      end while ret != :ok && ret != :cancel
+
+      UI.CloseDialog
+
+      return list_sav if ret == :cancel
+
+      list
+    end
+
+    def SaveConfig(modules_load, backup_prog_include, post_recovery_script, required_progs, copy_as_is, backup_options)
+      Rear.modified = true
+      Rear.output = UI.QueryWidget(Id(:output), :Value)
+      Rear.netfs_url = UI.QueryWidget(Id(:netfs_url), :Value)
+      Rear.netfs_keep_old_backup = UI.QueryWidget(Id(:netfs_keep_old_backup), :Value)
+      Rear.use_dhclient = UI.QueryWidget(Id(:use_dhclient), :Value)
+      Rear.modules_load = modules_load
+      Rear.backup_prog_include = backup_prog_include
+      Rear.post_recovery_script = post_recovery_script
+      Rear.required_progs = required_progs
+      Rear.copy_as_is = copy_as_is
+      Rear.backup_options = UI.QueryWidget(Id(:backup_options), :Value)
+
       if !Rear.Write
         Popup.Error(_("Cannot write rear configuration file."))
         return false
@@ -343,7 +433,7 @@ module Yast
 
 
       id = Convert.to_integer(
-        SCR.Execute(path(".process.start_shell"), "/usr/sbin/rear mkbackup")
+        SCR.Execute(path(".process.start_shell"), "/usr/sbin/rear -v mkbackup")
       )
       UI.ReplaceWidget(Id(:rp), Label(_("Running rear...")))
 
@@ -406,10 +496,6 @@ module Yast
       ret
     end
 
-
-
-
-
     # Dialog for setup up Rear
     def RearConfigDialog
       # For translators: Caption of the dialog
@@ -441,13 +527,51 @@ module Yast
           "<p><b>OK</b> saves the configuration and quits while <b>Cancel</b> closes the configuration dialog without saving.<p>"
         )
 
-
       # get varibales from config
       netfs_url = [Rear.netfs_url]
       netfs_keep_old_backup = Rear.netfs_keep_old_backup
-      modules_load = deep_copy(Rear.modules_load)
-      backup_prog_include = deep_copy(Rear.backup_prog_include)
+      use_dhclient = Rear.use_dhclient
+      modules_load = Rear.modules_load
+      backup_prog_include = Rear.backup_prog_include || []
+      post_recovery_script = Rear.post_recovery_script || []
+      required_progs = Rear.required_progs || []
+      copy_as_is = Rear.copy_as_is || []
+      backup_options = Rear.backup_options
       output = Rear.output
+
+      # set defaults:
+      if RearSystemCheck.Btrfs? && backup_prog_include.empty?
+        backup_prog_include = GetMountpoints()
+      end
+
+      # Fixme: Check item by item 
+      if required_progs.empty?
+        required_progs = %w(snapper chattr lsattr)
+      end
+
+      # Fixme: Check item by item
+      if copy_as_is.empty?
+        copy_as_is = %w(/usr/lib/snapper/installation-helper /etc/snapper/config-templates/default)
+      end
+
+      if backup_options.empty?
+        backup_options = "nfsvers=3,nolock"
+      end
+
+      # Maybe fixme: It is too complex to find out if this line is maybe already there.
+      # but maybe we can squeeze this into a shellscript and include this in the rear package?
+      # I even think we can run the 'if'-part already here and either include the 'then' part or not.
+      # To be clearified: Huha says quotas are broken. So ask jsmeix why he included this here.
+      if post_recovery_script.empty?
+        post_recovery_script = [
+          'if snapper --no-dbus -r $TARGET_FS_ROOT get-config | grep -q "^QGROUP.*[0-9]/[0-9]" ; '\
+          'then snapper --no-dbus -r $TARGET_FS_ROOT set-config QGROUP= ;'\
+          ' snapper --no-dbus -r $TARGET_FS_ROOT setup-quota && echo snapper setup-quota done'\
+          ' || echo snapper setup-quota failed ; '\
+          'else echo snapper setup-quota not used ; '\
+          'fi'
+        ]
+      end
 
       # set available options
       nfslocation = ["nfs://hostname/directory"]
@@ -456,10 +580,25 @@ module Yast
 
       # prepare advanced menu
       expertMenu = [
-        Item(Id(:additionalDirs), _("Additional Directories in Backup")),
+        Item(
+          Id(:additionalDirs),
+          _("Additional Directories in Backup")
+        ),
         Item(
           Id(:additionalModules),
           _("Additional Kernel Modules in Rescue System")
+        ),
+        Item(
+          Id(:requiredProgs),
+          _("Required Programs")
+        ),
+        Item(
+          Id(:copyAsIs),
+          _("Copy As Is")
+        ),
+        Item(
+          Id(:postRecoveryScript),
+          _("Post Recovery Script")
         )
       ]
 
@@ -511,16 +650,27 @@ module Yast
                 VSpacing(0.5),
                 HBox(
                   Left(
-                    CheckBox(
-                      Id(:netfs_keep_old_backup),
-                      Opt(:notify),
-                      _("&Keep old backup"),
-                      netfs_keep_old_backup
+                    HBox(
+                      CheckBox(
+                        Id(:netfs_keep_old_backup),
+                        Opt(:notify),
+                        _("&Keep old backup"),
+                        netfs_keep_old_backup
+                      ),
+                      Left(
+                        CheckBox(
+                          Id(:use_dhclient),
+                          Opt(:notify),
+                          _("Use &dhclient"),
+                          use_dhclient
+                        )
+                      )
                     )
                   ),
                   PushButton(Id(:scanusb), _("Rescan USB Devices"))
                 ),
-                VSpacing(0.5)
+                VSpacing(0.5),
+                TextEntry(Id(:backup_options), Opt(:notify), _("&Backup Options"), backup_options)
               ),
               HSpacing()
             )
@@ -598,7 +748,6 @@ module Yast
         return :abort
       end
 
-
       # this flag ensures that the combox is correctly
       # refilled when the USB/NFS combobox is changed
       rebuild_combobox_flag = false
@@ -641,7 +790,7 @@ module Yast
                   "Your USB medium will be overwritten. Do you want to continue?"
                 )
               )
-            SaveConfig(modules_load, backup_prog_include)
+            SaveConfig(modules_load, backup_prog_include, post_recovery_script, required_progs, copy_as_is, backup_options)
             RearRunDialog()
           end
         end
@@ -662,12 +811,23 @@ module Yast
           backup_prog_include = DirectoriesDialog(backup_prog_include)
         end
 
+        if ret == :requiredProgs
+          required_progs = ListEditDialog(_("Required Programs"), required_progs)
+        end
+
+        if ret == :copyAsIs
+          copy_as_is = ListEditDialog(_("Copy As Is"), copy_as_is)
+        end
+
+        if ret == :postRecoveryScript
+          post_recovery_script = ListEditDialog(_("Post Recovery Script"), post_recovery_script)
+        end
 
         ret = Convert.to_symbol(UI.UserInput)
       end while !Builtins.contains([:back, :abort, :cancel, :next, :ok], ret)
 
       if ret == :next || ret == :ok
-        SaveConfig(modules_load, backup_prog_include)
+        SaveConfig(modules_load, backup_prog_include, post_recovery_script, required_progs, copy_as_is, backup_options)
       end
 
       ret

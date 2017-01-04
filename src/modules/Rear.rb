@@ -44,9 +44,12 @@ module Yast
       @backup = ""
       @output = ""
       @netfs_url = ""
+      @backup_options = ""
       @netfs_keep_old_backup = true
+      @use_dhclient = false
       @modules_load = []
       @backup_prog_include = []
+      @copy_as_is = []
       @usbpartitions = {}
     end
 
@@ -90,7 +93,7 @@ module Yast
       return [] if rearlist == nil
 
       # remove brakets
-      rearlist = Builtins.regexpsub(rearlist, "^ *\\((.*)\\) *$", "\\1")
+      rearlist = Builtins.regexpsub(Convert.to_string(rearlist), "^ *\\((.*)\\) *$", "\\1")
 
       # split string seperated by spaces into a string list, respect backslash escaped blanks
       ycplisttmp = Builtins.splitstring(rearlist, " ")
@@ -143,11 +146,11 @@ module Yast
         @output = Convert.to_string(SCR.Read(path(".etc.rear_conf.v.OUTPUT")))
         @output = "" if @output == nil
 
-        @netfs_url = Convert.to_string(
-          SCR.Read(path(".etc.rear_conf.v.NETFS_URL"))
-        )
+        @netfs_url = SCR.Read(path(".etc.rear_conf.v.BACKUP_URL"))
         @netfs_url = "" if @netfs_url == nil
 
+        @backup_options = SCR.Read(path(".etc.rear_conf.v.BACKUP_OPTIONS"))
+        @backup_options = "" if @backup_options == nil
 
         # rear interprets all non-empty values as yes
         netfs_keep_old_backup_tmp = Convert.to_string(
@@ -159,15 +162,43 @@ module Yast
           @netfs_keep_old_backup = false
         end
 
-        modules_load_tmp = Convert.to_string(
-          SCR.Read(path(".etc.rear_conf.v.MODULES_LOAD"))
+        use_dhclient_tmp = Convert.to_string(
+          SCR.Read(path(".etc.rear_conf.v.USE_DHCLIENT"))
         )
+        if use_dhclient_tmp != "" && use_dhclient_tmp != nil
+          @use_dhclient = true
+        else
+          @use_dhclient = false
+        end
+
+        modules_load_tmp =
+          SCR.Read(path(".etc.rear_conf.v.MODULES_LOAD"))
+
         @modules_load = RearListToYCPList(modules_load_tmp)
 
-        backup_prog_include_tmp = Convert.to_string(
+        backup_prog_include_tmp =
           SCR.Read(path(".etc.rear_conf.v.BACKUP_PROG_INCLUDE"))
-        )
+
         @backup_prog_include = RearListToYCPList(backup_prog_include_tmp)
+
+        post_recovery_script_tmp = 
+          SCR.Read(path(".etc.rear_conf.v.POST_RECOVERY_SCRIPT"))
+
+        @post_recovery_script = RearListToYCPList(post_recovery_script_tmp)
+
+        required_progs_tmp =
+          SCR.Read(path(".etc.rear_conf.v.REQUIRED_PROGS"))
+
+        @required_progs = RearListToYCPList(required_progs_tmp).delete_if{ |e|
+          e == "${REQUIRED_PROGS[@]}"
+        }
+
+        copy_as_is_tmp =
+          SCR.Read(path(".etc.rear_conf.v.COPY_AS_IS"))
+
+        @copy_as_is = RearListToYCPList(copy_as_is).delete_if{ |e|
+          e == "${COPY_AS_IS[@]}"
+        }
 
         return true
       end
@@ -190,14 +221,24 @@ module Yast
       SCR.Write(path(".etc.rear_conf.v.OUTPUT"), @output) if @output != ""
 
       if @netfs_url != ""
-        SCR.Write(path(".etc.rear_conf.v.NETFS_URL"), @netfs_url)
+        SCR.Write(path(".etc.rear_conf.v.BACKUP_URL"), @netfs_url)
       end
+
+      SCR.Write(path(".etc.rear_conf.v.BACKUP_OPTIONS"), @backup_options)
 
       if @netfs_keep_old_backup != nil
         if @netfs_keep_old_backup
           SCR.Write(path(".etc.rear_conf.v.NETFS_KEEP_OLD_BACKUP_COPY"), "yes")
         else
           SCR.Write(path(".etc.rear_conf.v.NETFS_KEEP_OLD_BACKUP_COPY"), "")
+        end
+      end
+
+      if @use_dhclient != nil
+        if @use_dhclient
+          SCR.Write(path(".etc.rear_conf.v.USE_DHCLIENT"), "yes")
+        else
+          SCR.Write(path(".etc.rear_conf.v.USE_DHCLIENT"), "")
         end
       end
 
@@ -210,13 +251,35 @@ module Yast
         SCR.Write(path(".etc.rear_conf.v.MODULES_LOAD"), "( )")
       end
 
-      if @backup_prog_include != []
+      unless @backup_prog_include.empty?
         SCR.Write(
           path(".etc.rear_conf.v.BACKUP_PROG_INCLUDE"),
           YCPListToRearList(@backup_prog_include)
         )
       end
 
+      unless @post_recovery_script.empty?
+        SCR.Write(
+          path(".etc.rear_conf.v.POST_RECOVERY_SCRIPT"),
+          YCPListToRearList(@post_recovery_script)
+        )
+      end
+
+      unless @required_progs.empty?
+        @required_progs |= %w(${REQUIRED_PROGS[@]})
+        SCR.Write(
+          path(".etc.rear_conf.v.REQUIRED_PROGS"),
+          YCPListToRearList(@required_progs)
+        )
+      end
+
+      unless @copy_as_is.empty?
+        @copy_as_is |= %w(${COPY_AS_IS[@]})
+        SCR.Write(
+          path(".etc.rear_conf.v.COPY_AS_IS"),
+          YCPListToRearList(@copy_as_is)
+        )
+      end
       SCR.Write(path(".etc.rear_conf"), nil)
     end
 
@@ -224,9 +287,14 @@ module Yast
     publish :variable => :backup, :type => "string"
     publish :variable => :output, :type => "string"
     publish :variable => :netfs_url, :type => "string"
+    publish :variable => :backup_options, :type => "string"
     publish :variable => :netfs_keep_old_backup, :type => "boolean"
+    publish :variable => :use_dhclient, :type => "boolean"
     publish :variable => :modules_load, :type => "list <string>"
     publish :variable => :backup_prog_include, :type => "list <string>"
+    publish :variable => :post_recovery_script, :type => "list <string>"
+    publish :variable => :required_progs, :type => "list <string>"
+    publish :variable => :copy_as_is, :type => "list <string>"
     publish :variable => :usbpartitions, :type => "map <string, string>"
     publish :function => :GetUsbPartitions, :type => "map <string, string> ()"
     publish :function => :ReadSysconfig, :type => "boolean ()"
