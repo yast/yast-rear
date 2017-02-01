@@ -141,16 +141,16 @@ module Yast
     def ReadSysconfig
       if FileUtils.Exists("/etc/rear/local.conf")
         @backup = Convert.to_string(SCR.Read(path(".etc.rear_conf.v.BACKUP")))
-        @backup = "" if @backup == nil
+        @backup ||= ""
 
         @output = Convert.to_string(SCR.Read(path(".etc.rear_conf.v.OUTPUT")))
-        @output = "" if @output == nil
+        @output ||= ""
 
         @netfs_url = SCR.Read(path(".etc.rear_conf.v.BACKUP_URL"))
-        @netfs_url = "" if @netfs_url == nil
+        @netfs_url ||= ""
 
         @backup_options = SCR.Read(path(".etc.rear_conf.v.BACKUP_OPTIONS"))
-        @backup_options = "" if @backup_options == nil
+        @backup_options ||= ""
 
         # rear interprets all non-empty values as yes
         netfs_keep_old_backup_tmp = Convert.to_string(
@@ -162,43 +162,33 @@ module Yast
           @netfs_keep_old_backup = false
         end
 
-        use_dhclient_tmp = Convert.to_string(
-          SCR.Read(path(".etc.rear_conf.v.USE_DHCLIENT"))
-        )
-        if use_dhclient_tmp != "" && use_dhclient_tmp != nil
-          @use_dhclient = true
-        else
-          @use_dhclient = false
-        end
+        use_dhclient_tmp = SCR.Read(path(".etc.rear_conf.v.USE_DHCLIENT"))
+        @use_dhclient = use_dhclient_tmp != "" && use_dhclient_tmp != nil
 
         modules_load_tmp =
           SCR.Read(path(".etc.rear_conf.v.MODULES_LOAD"))
-
         @modules_load = RearListToYCPList(modules_load_tmp)
 
         backup_prog_include_tmp =
           SCR.Read(path(".etc.rear_conf.v.BACKUP_PROG_INCLUDE"))
-
         @backup_prog_include = RearListToYCPList(backup_prog_include_tmp)
 
         post_recovery_script_tmp = 
           SCR.Read(path(".etc.rear_conf.v.POST_RECOVERY_SCRIPT"))
-
         @post_recovery_script = RearListToYCPList(post_recovery_script_tmp)
 
-        required_progs_tmp =
-          SCR.Read(path(".etc.rear_conf.v.REQUIRED_PROGS"))
+        # These two configuration parameters extend a rear system variable.
+        # It is bash, so this is done by including the old value of that variable
+        # in the new value.
+        # We remove it here, because we don't want to give the user the option to
+        # remove it. Before saving it gets added back again.
+        required_progs_tmp = SCR.Read(path(".etc.rear_conf.v.REQUIRED_PROGS"))
+        @required_progs = RearListToYCPList(required_progs_tmp)
+        @required_progs.delete("${REQUIRED_PROGS[@]}")
 
-        @required_progs = RearListToYCPList(required_progs_tmp).delete_if{ |e|
-          e == "${REQUIRED_PROGS[@]}"
-        }
-
-        copy_as_is_tmp =
-          SCR.Read(path(".etc.rear_conf.v.COPY_AS_IS"))
-
-        @copy_as_is = RearListToYCPList(copy_as_is).delete_if{ |e|
-          e == "${COPY_AS_IS[@]}"
-        }
+        copy_as_is_tmp = SCR.Read(path(".etc.rear_conf.v.COPY_AS_IS"))
+        @copy_as_is = RearListToYCPList(copy_as_is_tmp)
+        @copy_as_is.delete("${COPY_AS_IS[@]}")
 
         return true
       end
@@ -225,31 +215,11 @@ module Yast
       end
 
       SCR.Write(path(".etc.rear_conf.v.BACKUP_OPTIONS"), @backup_options)
+      SCR.Write(path(".etc.rear_conf.v.NETFS_KEEP_OLD_BACKUP_COPY"), @netfs_keep_old_backup ? "yes" : "")
+      SCR.Write(path(".etc.rear_conf.v.USE_DHCLIENT"), @use_dhclient ? "yes" : "")
 
-      if @netfs_keep_old_backup != nil
-        if @netfs_keep_old_backup
-          SCR.Write(path(".etc.rear_conf.v.NETFS_KEEP_OLD_BACKUP_COPY"), "yes")
-        else
-          SCR.Write(path(".etc.rear_conf.v.NETFS_KEEP_OLD_BACKUP_COPY"), "")
-        end
-      end
-
-      if @use_dhclient != nil
-        if @use_dhclient
-          SCR.Write(path(".etc.rear_conf.v.USE_DHCLIENT"), "yes")
-        else
-          SCR.Write(path(".etc.rear_conf.v.USE_DHCLIENT"), "")
-        end
-      end
-
-      if @modules_load != []
-        SCR.Write(
-          path(".etc.rear_conf.v.MODULES_LOAD"),
-          YCPListToRearList(@modules_load)
-        )
-      else
-        SCR.Write(path(".etc.rear_conf.v.MODULES_LOAD"), "( )")
-      end
+      modules_load_tmp = @modules_load != [] ? YCPListToRearList(@modules_load) : "( )"
+      SCR.Write(path(".etc.rear_conf.v.MODULES_LOAD"), modules_load_tmp)
 
       unless @backup_prog_include.empty?
         SCR.Write(

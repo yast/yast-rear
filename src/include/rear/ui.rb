@@ -25,8 +25,31 @@
 # Authors:	Thomas Goettlicher <tgoettlicher@suse.de>
 #
 # $Id$
+
+require "rear/list_edit_dialog"
+require "rear/add_config_dialog"
+
 module Yast
   module RearUiInclude
+    # The defaults that are needed to get rear working with our setup (btrfs & snapper)
+    # Those are taken from
+    # https://github.com/rear/rear/blob/master/usr/share/rear/conf/examples/SLE12-SP2-btrfs-example.conf
+    REQUIRED_PROGS = %w(snapper chattr lsattr)
+    COPY_AS_IS = %w(/usr/lib/snapper/installation-helper /etc/snapper/config-templates/default)
+    BACKUP_OPTIONS = "nfsvers=3,nolock"
+
+    # This one looks really ugly. Unfortunately there is no other way to solve this, according to jsmeix
+    # It might be worth a try to let the 'if' -part run here in yast and then either add just the
+    # 'then' part here or the 'else' part (which basically is empty)
+    POST_RECOVERY_SCRIPT = [
+      'if snapper --no-dbus -r $TARGET_FS_ROOT get-config | grep -q "^QGROUP.*[0-9]/[0-9]" ; '\
+      'then snapper --no-dbus -r $TARGET_FS_ROOT set-config QGROUP= ;'\
+      ' snapper --no-dbus -r $TARGET_FS_ROOT setup-quota && echo snapper setup-quota done'\
+      ' || echo snapper setup-quota failed ; '\
+      'else echo snapper setup-quota not used ; '\
+      'fi'
+    ]
+
     def initialize_rear_ui(include_target)
       Yast.import "UI"
 
@@ -70,19 +93,31 @@ module Yast
 
     # returns a list of mountpoints that have to be included in BACKUP_PROG_INCLUDE
     def GetMountpoints
-      # -D excludes pseudo filesystems
-      # -r raw output, no ascii-art
-      # -n no column header
-      cmd = "findmnt -D -t notmpfs,nodevtmpfs -o TARGET -n -r | sort"
+      cmd = "findmnt --noheadings --raw --types btrfs "\
+            "--output TARGET | sort"
       output = SCR.Execute(path(".target.bash_output"), cmd, "")
       mountpoints = output["stdout"].split(/\n/)
-
-      # Do not include /, /.snapshots and /var/crash
-      mountpoints.delete_if { |e|
-        %w(/ /.snapshots /var/crash).include?(e)
-      }
-
+      # kick out by default:
+      # / - because it gets backed-up by default
+      # /.snapshots and /var/crash - just bloat the backup
+      mountpoints -= %w(/ /.snapshots /var/crash)
       mountpoints.map {|e| e + "/*" }
+    end
+
+    # helper to compare an array with a default array and returns a formatted
+    # list containing the items that need to be added to the array to become
+    # equal to the default array.
+    def ArrayChecker(value, default)
+      to_add = default - value
+
+      unless to_add.empty?
+        message =
+          "<ul><li>" +
+          to_add.join("</li><li>") +
+          "</li></ul>"
+      end
+
+      return message
     end
 
     # returns availible partitions on usb media
@@ -201,77 +236,6 @@ module Yast
       deep_copy(directories)
     end
 
-    def ListEditDialog(title, list)
-      # store original list for the case that the users clicks cancel
-      list_sav = list
-
-      UI.OpenDialog(
-        MinSize(
-          45,
-          15,
-          HBox(
-            HSpacing(1),
-            VBox(
-              VSpacing(0.5),
-              VBox(
-                VSquash(
-                  HBox(
-                    TextEntry(Id(:program), Opt(:notify), _("&New Entry")),
-                    VBox(
-                      VSpacing(1),
-                      PushButton(Id(:additem), Label.AddButton)
-                    )
-                  )
-                ),
-                HBox(
-                  SelectionBox(
-                    Id(:list),
-                    title,
-                    list
-                  ),
-                  Top(
-                    VBox(
-                      VSpacing(1),
-                      PushButton(Id(:delitem), Label.DeleteButton)
-                    )
-                  )
-                ),
-                ButtonBox(
-                  PushButton(Id(:ok), _("&OK")),
-                  PushButton(Id(:cancel), _("&Cancel"))
-                )
-              ),
-              VSpacing(0.5)
-            ),
-            HSpacing(1)
-          )
-        )
-      )
-
-      ret = nil
-      begin
-        if ret == :delitem
-          delelem = UI.QueryWidget(Id(:list), :CurrentItem)
-          list.delete_if { |elem| elem == delelem }
-          UI.ChangeWidget(Id(:list), :Items, list)
-        end
-        if ret == :additem
-          addelem = UI.QueryWidget(Id(:program), :Value)
-          if !Builtins.contains(list, addelem)
-            list = Builtins.add(list, addelem)
-            UI.ChangeWidget(Id(:list), :Items, list)
-          end
-        end
-        ret = Convert.to_symbol(UI.UserInput)
-      end while ret != :ok && ret != :cancel
-
-      UI.CloseDialog
-
-      return list_sav if ret == :cancel
-
-      list
-    end
-
     def SaveConfig(modules_load, backup_prog_include, post_recovery_script, required_progs, copy_as_is, backup_options)
       Rear.modified = true
       Rear.output = UI.QueryWidget(Id(:output), :Value)
@@ -292,7 +256,6 @@ module Yast
 
       true
     end
-
 
     # Dialog to Choose Kernel Modules
     def KernelModulesDialog(modules)
@@ -431,8 +394,8 @@ module Yast
         return :close
       end
 
-
       id = Convert.to_integer(
+        # -v : verbose; without it rear runs completely silent
         SCR.Execute(path(".process.start_shell"), "/usr/sbin/rear -v mkbackup")
       )
       UI.ReplaceWidget(Id(:rp), Label(_("Running rear...")))
@@ -538,39 +501,44 @@ module Yast
       copy_as_is = Rear.copy_as_is || []
       backup_options = Rear.backup_options
       output = Rear.output
+      mountpoints = GetMountpoints()
+      message = ""
 
-      # set defaults:
-      if RearSystemCheck.Btrfs? && backup_prog_include.empty?
-        backup_prog_include = GetMountpoints()
+      # Set defaults:
+      # This is not mandatory, so we only set it, if empty
+      backup_options = BACKUP_OPTIONS if backup_options.empty?
+
+      if RearSystemCheck.Btrfs?
+        msg = ArrayChecker(backup_prog_include, mountpoints)
+        message += _("Additional directories in the backup:") + msg if msg
       end
 
-      # Fixme: Check item by item 
-      if required_progs.empty?
-        required_progs = %w(snapper chattr lsattr)
-      end
+      msg = ArrayChecker(required_progs, REQUIRED_PROGS)
+      message += _("Additional programs in the rescue system:") + msg if msg
 
-      # Fixme: Check item by item
-      if copy_as_is.empty?
-        copy_as_is = %w(/usr/lib/snapper/installation-helper /etc/snapper/config-templates/default)
-      end
+      msg = ArrayChecker(copy_as_is, COPY_AS_IS)
+      message += _("Additional files to be copied into the rescue system:") + msg if msg
 
-      if backup_options.empty?
-        backup_options = "nfsvers=3,nolock"
-      end
+      msg = ArrayChecker(post_recovery_script, POST_RECOVERY_SCRIPT)
+      message += _("Additional post recovery scripts:") + msg if msg
 
-      # Maybe fixme: It is too complex to find out if this line is maybe already there.
-      # but maybe we can squeeze this into a shellscript and include this in the rear package?
-      # I even think we can run the 'if'-part already here and either include the 'then' part or not.
-      # To be clearified: Huha says quotas are broken. So ask jsmeix why he included this here.
-      if post_recovery_script.empty?
-        post_recovery_script = [
-          'if snapper --no-dbus -r $TARGET_FS_ROOT get-config | grep -q "^QGROUP.*[0-9]/[0-9]" ; '\
-          'then snapper --no-dbus -r $TARGET_FS_ROOT set-config QGROUP= ;'\
-          ' snapper --no-dbus -r $TARGET_FS_ROOT setup-quota && echo snapper setup-quota done'\
-          ' || echo snapper setup-quota failed ; '\
-          'else echo snapper setup-quota not used ; '\
-          'fi'
-        ]
+      unless message.empty?
+        message =
+          "<p>" + _("YaST would like to change your ReaR configuration.") + "</p>" +
+          message +
+          "<strong>" + 
+          _("You might end up in an unusable backup if you don't accept this.") +
+          "</strong>"
+
+        if RearConfig::AddConfigDialog.new(message).run
+          # Add the important elements to the existing config array:
+          backup_prog_include |= mountpoints
+          required_progs |= REQUIRED_PROGS
+          copy_as_is |= COPY_AS_IS
+          post_recovery_script |= POST_RECOVERY_SCRIPT
+        else
+          Builtins.y2warning("User did not accept the config changes we suggested.")
+        end
       end
 
       # set available options
@@ -795,7 +763,6 @@ module Yast
           end
         end
 
-
         if ret == :scanusb
           if UI.QueryWidget(Id(:backup_type), :Value) == "USB"
             UI.ChangeWidget(Id(:netfs_url), :Items, UsbPartitions())
@@ -812,15 +779,18 @@ module Yast
         end
 
         if ret == :requiredProgs
-          required_progs = ListEditDialog(_("Required Programs"), required_progs)
+          list = RearConfig::ListEditDialog.new(_("Required Programs"), required_progs).run
+          required_progs = list if list
         end
 
         if ret == :copyAsIs
-          copy_as_is = ListEditDialog(_("Copy As Is"), copy_as_is)
+          list = RearConfig::ListEditDialog.new(_("Copy As Is"), copy_as_is).run
+          copy_as_is = list if list
         end
 
         if ret == :postRecoveryScript
-          post_recovery_script = ListEditDialog(_("Post Recovery Script"), post_recovery_script)
+          list = RearConfig::ListEditDialog.new(_("Post Recovery Script"), post_recovery_script).run
+          post_recovery_script = list if list
         end
 
         ret = Convert.to_symbol(UI.UserInput)

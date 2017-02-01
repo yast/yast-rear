@@ -31,6 +31,8 @@ require "yast"
 
 module Yast
   class RearSystemCheckClass < Module
+    @btrfs = false
+
     def main
       textdomain "rear"
 
