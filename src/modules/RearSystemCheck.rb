@@ -31,6 +31,8 @@ require "yast"
 
 module Yast
   class RearSystemCheckClass < Module
+    @btrfs = false
+
     def main
       textdomain "rear"
 
@@ -56,7 +58,7 @@ module Yast
             _("Cannot figure out which bootloader is used.")
           )
         end
-        if loader_type != "grub"
+        if loader_type != "grub" && loader_type != "grub2" && loader_type != "grub2-efi"
           Builtins.y2error(
             Builtins.sformat(
               "Not supported by rear: bootloader %1 is used.",
@@ -89,7 +91,7 @@ module Yast
     # returns error message if system is not supported, otherwise nil
     def SystemCheckDisk
       storage = Storage.GetTargetMap
-      supportedfs = [:ext2, :ext3, :ext4, :tmpfs, :swap, :none, :nfs, :nfs4]
+      supportedfs = [:ext2, :ext3, :ext4, :tmpfs, :swap, :none, :nfs, :nfs4, :btrfs, :xfs]
       unsupported = []
 
       Builtins.foreach(storage) do |device, devicemap|
@@ -120,20 +122,10 @@ module Yast
         end
         parts = Ops.get_list(devicemap, "partitions", [])
         Builtins.foreach(parts) do |part|
-          dev = Ops.get_string(part, "device", "")
-          # check partitions
-          if Ops.get_symbol(part, "mountby", :none) == :uuid
-            Builtins.y2error(
-              Builtins.sformat(
-                "Not supported by rear: Partition %1 is mounted by uuid.",
-                dev
-              )
-            )
-            unsupported = Builtins.add(
-              unsupported,
-              Builtins.sformat(_("Partition %1 is mounted by uuid."), dev)
-            )
+          if part["used_fs"] == :btrfs
+            @btrfs = true
           end
+          dev = part["device"]
           if !Builtins.contains(
               supportedfs,
               Ops.get_symbol(part, "used_fs", :none)
@@ -160,10 +152,9 @@ module Yast
       deep_copy(unsupported)
     end
 
-
-
-
-
+    def Btrfs?
+      @btrfs
+    end
 
     # runs all system checks
     # make sure to add your function call here if you add further checks
@@ -187,6 +178,7 @@ module Yast
     end
 
     publish :function => :SystemCheck, :type => "list <string> ()"
+    publish :function => :Btrfs?, :type => "boolean ()"
   end
 
   RearSystemCheck = RearSystemCheckClass.new
