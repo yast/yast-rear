@@ -10,7 +10,6 @@
 .libs
 doc/
 package/*.bz2
-package/*.spec
 stamp-h*
 aclocal.m4
 autodocs-cc.ami
