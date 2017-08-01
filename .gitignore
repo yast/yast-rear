@@ -4,9 +4,11 @@
 *.m4
 *.ybc
 *.pot
+.yardoc
 .dep
 .deps
 .libs
+doc/
 package/*.bz2
 package/*.spec
 stamp-h*
@@ -32,7 +34,7 @@ libtool
 ltconfig
 ltmain.sh
 Makefile
-Makefile.am
+/Makefile.am
 Makefile.am.common
 Makefile.in
 missing
