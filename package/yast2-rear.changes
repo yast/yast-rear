@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Tue Aug  1 13:23:03 UTC 2017 - lslezak@suse.cz
+
+- Added missing files to the RPM package, the recently added
+  source files were not installed and packaged into the final RPM
+  (bsc#1051340)
+- 3.2.1
+
+-------------------------------------------------------------------
 Wed Feb  8 09:33:32 UTC 2017 - cwh@suse.com
 
 - Removed outdated checks for unsupported system configuration
