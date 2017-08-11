@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Fri Aug 11 11:09:49 UTC 2017 - ancor@suse.com
+
+- Use yast2-storage-ng instead of yast2-storage (part of
+  fate#318196)
+- 3.3.0
+
+-------------------------------------------------------------------
 Tue Aug  1 13:23:03 UTC 2017 - lslezak@suse.cz
 
 - Added missing files to the RPM package, the recently added
