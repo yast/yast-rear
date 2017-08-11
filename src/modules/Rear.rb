@@ -59,7 +59,8 @@ module Yast
       usbparts = {}
 
       storage = Y2Storage::StorageManager.instance
-      # (re)probing
+      # (re)probe. Reprobing is safe because yast2-rear is always executed
+      # standalone, never as part of the installer.
       storage.probe
 
       storage.probed.disks.select(&:usb?).each do |disk|
