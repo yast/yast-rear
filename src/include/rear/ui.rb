@@ -63,7 +63,6 @@ module Yast
       Yast.import "Popup"
       Yast.import "Service"
       Yast.import "Wizard"
-      Yast.import "Storage"
       Yast.import "Progress"
       Yast.import "Confirm"
       Yast.import "Report"
@@ -814,8 +813,6 @@ module Yast
         UI.CloseDialog
         return :abort
       end
-
-      Storage.InitLibstorage(true) # true: read-only
 
       # Rear read dialog caption
       caption = _("Reading Rear Configuration")

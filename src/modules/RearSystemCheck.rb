@@ -28,6 +28,7 @@
 #
 # Checks if the system is supported by rear
 require "yast"
+require "y2storage"
 
 module Yast
   class RearSystemCheckClass < Module
@@ -37,7 +38,6 @@ module Yast
       textdomain "rear"
 
       Yast.import "FileUtils"
-      Yast.import "Storage"
     end
 
     # check bootloader
@@ -90,60 +90,32 @@ module Yast
     #  - filesystem
     # returns error message if system is not supported, otherwise nil
     def SystemCheckDisk
-      storage = Storage.GetTargetMap
+      devicegraph = Y2Storage::StorageManager.instance.probed
       supportedfs = [:ext2, :ext3, :ext4, :tmpfs, :swap, :none, :nfs, :nfs4, :btrfs, :xfs]
       unsupported = []
 
-      Builtins.foreach(storage) do |device, devicemap|
+      devicegraph.disk_devices.each do |device|
         # check devices
-        if Ops.get_symbol(devicemap, "transport", :none) == :iscsi
-          Builtins.y2error(
-            Builtins.sformat(
-              "Not supported by rear: Device %1 is iscsi.",
-              device
-            )
-          )
-          unsupported = Builtins.add(
-            unsupported,
-            Builtins.sformat(_("Device %1 is iscsi."), device)
-          )
+        if device.respond_to?(:transport) && device.transport.is?(:iscsi)
+          Builtins.y2error("Not supported by rear: Device #{device.name} is iscsi.")
+          unsupported << Builtins.sformat(_("Device %1 is iscsi."), device.name)
         end
-        if Ops.get_symbol(devicemap, "type", :none) == :CT_DMMULTIPATH
-          Builtins.y2error(
-            Builtins.sformat(
-              "Not supported by rear: Device %1 is multipath.",
-              device
-            )
-          )
-          unsupported = Builtins.add(
-            unsupported,
-            Builtins.sformat(_("Device %1 is multipath."), device)
-          )
+        if device.is?(:multipath)
+          Builtins.y2error("Not supported by rear: Device #{device.name} is multipath.")
+          unsupported << Builtins.sformat(_("Device %1 is multipath."), device.name)
         end
-        parts = Ops.get_list(devicemap, "partitions", [])
-        Builtins.foreach(parts) do |part|
-          if part["used_fs"] == :btrfs
-            @btrfs = true
-          end
-          dev = part["device"]
-          if !Builtins.contains(
-              supportedfs,
-              Ops.get_symbol(part, "used_fs", :none)
-            )
+        device.partitions.map(&:filesystem).compact.each do |filesystem|
+          name = filesystem.plain_blk_devices.first.name
+          type = filesystem.type
+
+          @btrfs = true if type.is?(:btrfs)
+
+          if !supportedfs.include?(type.to_sym)
             Builtins.y2error(
-              Builtins.sformat(
-                "Not supported by rear: Partition %1 uses an unsupported filesystem (%2).",
-                dev,
-                Ops.get_symbol(part, "used_fs", :none)
-              )
+              "Not supported by rear: Partition #{name} uses an unsupported filesystem (#{type})."
             )
-            unsupported = Builtins.add(
-              unsupported,
-              Builtins.sformat(
-                _("Partition %1 uses an unsupported filesystem (%2)."),
-                dev,
-                Ops.get_symbol(part, "used_fs", :none)
-              )
+            unsupported << Builtins.sformat(
+              _("Partition %1 uses an unsupported filesystem (%2)."), name, type.to_s
             )
           end
         end
