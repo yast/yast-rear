@@ -29,6 +29,7 @@
 # Representation of the Rear configuration.
 # Input and output routines.
 require "yast"
+require "y2storage"
 
 module Yast
   class RearClass < Module
@@ -36,8 +37,6 @@ module Yast
       textdomain "rear"
 
       Yast.import "FileUtils"
-      Yast.import "Storage"
-
       # Data was modified?
       @modified = false
 
@@ -59,26 +58,15 @@ module Yast
       usbdevs = []
       usbparts = {}
 
-      storage = Storage.ReReadTargetMap
+      storage = Y2Storage::StorageManager.instance
+      # (re)probing
+      storage.probe
 
-      Builtins.foreach(storage) do |device, devicemap|
-        if Ops.get_symbol(devicemap, "transport", :none) == :usb
-          parts = Ops.get_list(devicemap, "partitions", [])
-          Builtins.foreach(parts) do |part|
-            dev = Ops.get_string(part, "device", "")
-            size_k = Ops.get_integer(part, "size_k", 0)
-            Ops.set(
-              usbparts,
-              Builtins.sformat("usb://%1", dev),
-              Builtins.sformat(
-                "%1 (%2)",
-                dev,
-                Storage.KByteToHumanString(size_k)
-              )
-            )
-          end
+      storage.probed.disks.select(&:usb?).each do |disk|
+        disk.partitions.reject { |i| i.type.is?(:extended) }.each do |part|
+          usbparts["usb://#{part.name}"] = "#{part.name} (#{part.size.to_human_string})"
         end
-      end if storage != nil
+      end
       @usbpartitions = deep_copy(usbparts)
       deep_copy(usbparts)
     end

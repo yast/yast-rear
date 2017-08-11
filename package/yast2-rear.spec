@@ -25,11 +25,11 @@ Source0:        %{name}-%{version}.tar.bz2
 
 Group:          System/YaST
 License:        GPL-2.0
-BuildRequires:	docbook-xsl-stylesheets doxygen libxslt perl-XML-Writer sgml-skel update-desktop-files yast2 yast2-testsuite yast2-storage
+BuildRequires:	docbook-xsl-stylesheets doxygen libxslt perl-XML-Writer sgml-skel update-desktop-files yast2 yast2-testsuite yast2-storage-ng
 BuildRequires:  yast2-devtools >= 3.1.10
 Requires:	yast2
 Requires:       rear >= 1.10.0
-Requires:       yast2-storage
+Requires:       yast2-storage-ng
 
 BuildArchitectures:	noarch
 
