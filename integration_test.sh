@@ -31,6 +31,8 @@ function expect_text()
     echo "Matched expected text: '$2'"
   else
     echo "ERROR: No match for expected text '$2'"
+    echo "y2log content:"
+    tail -n 50 /var/log/YaST2/y2log
     exit 1
   fi
 }
@@ -39,6 +41,8 @@ function not_expect_text()
 {
   if tmux capture-pane -p -t "$1" | grep -q "$2"; then
     echo "ERROR: Matched unexpected text: '$2'"
+    echo "y2log content:"
+    tail -n 50 /var/log/YaST2/y2log
     exit 1
   fi
 }
