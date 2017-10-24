@@ -41,6 +41,9 @@ function not_expect_text()
 {
   if tmux capture-pane -p -t "$1" | grep -q "$2"; then
     echo "ERROR: Matched unexpected text: '$2'"
+    echo "/sys/ext_range:"
+    ls -l /sys/ext_range
+    cat /sys/ext_range
     echo "y2log content:"
     tail -n 50 /var/log/YaST2/y2log
     exit 1
