@@ -63,3 +63,4 @@ The YaST2 component for configuring Rear - Relax and Recover Backup
 %{yast_desktopdir}/rear.desktop
 %{yast_scrconfdir}/*.scr
 %doc %{yast_docdir}
+%license COPYING
