@@ -17,7 +17,7 @@
 
 
 Name:           yast2-rear
-Version:        4.0.0
+Version:        4.0.1
 Release:        0
 
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
@@ -62,5 +62,6 @@ The YaST2 component for configuring Rear - Relax and Recover Backup
 %{yast_libdir}/rear/*.rb
 %{yast_desktopdir}/rear.desktop
 %{yast_scrconfdir}/*.scr
+%{_datadir}/icons/*
 %doc %{yast_docdir}
 %license COPYING
