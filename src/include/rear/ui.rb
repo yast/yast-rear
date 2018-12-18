@@ -72,7 +72,7 @@ module Yast
     def UsedModules
       modules = []
 
-      cmd = "lsmod | tail -n +2 | cut -d ' ' -f1 | tac | tr -s '[:space:]' ' '"
+      cmd = "/usr/bin/lsmod | /usr/bin/tail -n +2 | /usr/bin/cut -d ' ' -f1 | /usr/bin/tac | /usr/bin/tr -s '[:space:]' ' '"
       output = Convert.to_map(SCR.Execute(path(".target.bash_output"), cmd, ""))
       mods = Builtins.splitstring(Ops.get_string(output, "stdout", ""), " ")
 
@@ -92,8 +92,8 @@ module Yast
 
     # returns a list of mountpoints that have to be included in BACKUP_PROG_INCLUDE
     def GetMountpoints
-      cmd = "findmnt --noheadings --raw --types btrfs "\
-            "--output TARGET | sort"
+      cmd = "/usr/bin/findmnt --noheadings --raw --types btrfs "\
+            "--output TARGET | /usr/bin/sort"
       output = SCR.Execute(path(".target.bash_output"), cmd, "")
       mountpoints = output["stdout"].split(/\n/)
       # kick out by default:
