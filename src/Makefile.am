@@ -19,7 +19,7 @@ scrconf_DATA = \
   scrconf/rear_conf.scr
 
 desktop_DATA = \
-  desktop/rear.desktop
+  desktop/org.openSUSE.YaST.Rear.desktop
 
 scalabledir = @icondir@/hicolor/scalable/apps
 scalable_DATA = \
