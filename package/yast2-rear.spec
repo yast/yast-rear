@@ -17,7 +17,7 @@
 
 
 Name:           yast2-rear
-Version:        4.1.0
+Version:        4.2.0
 Release:        0
 Summary:        YaST2 - Rear - Relax and Recover
 Group:          System/YaST
