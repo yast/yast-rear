@@ -806,7 +806,7 @@ module Yast
     # The whole sequence
     def RearSequence
       Wizard.OpenOKDialog
-      Wizard.SetDesktopTitleAndIcon("org.openSUSE.YaST.Rear")
+      Wizard.SetDesktopTitleAndIcon("org.opensuse.yast.Rear")
 
       if !Confirm.MustBeRoot
         UI.CloseDialog
