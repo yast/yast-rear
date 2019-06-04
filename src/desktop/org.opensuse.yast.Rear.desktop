@@ -18,6 +18,7 @@ X-SuSE-YaST-Keywords=rear,backup
 Icon=yast-backup
 Exec=xdg-su -c "/sbin/yast2 rear"
 
-Name=Rear Backup
-GenericName=Configure Rear Backup
+Name=YaST Rear Backup
+GenericName=Rear Backup
+Comment=Configure Rear Backup
 StartupNotify=true

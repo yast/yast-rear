@@ -12,56 +12,58 @@
 # license that conforms to the Open Source Definition (Version 1.9)
 # published by the Open Source Initiative.
 
-# Please submit bugfixes or comments via http://bugs.opensuse.org/
+# Please submit bugfixes or comments via https://bugs.opensuse.org/
 #
 
 
 Name:           yast2-rear
-Version:        4.1.0
+Version:        4.2.0
 Release:        0
-
-BuildRoot:      %{_tmppath}/%{name}-%{version}-build
-Source0:        %{name}-%{version}.tar.bz2
-
+Summary:        YaST2 - Rear - Relax and Recover
 Group:          System/YaST
 License:        GPL-2.0-only
-BuildRequires:	docbook-xsl-stylesheets doxygen libxslt perl-XML-Writer sgml-skel update-desktop-files yast2 yast2-testsuite yast2-storage-ng
-BuildRequires:  yast2-devtools >= 3.1.10
-Requires:	yast2
+Url:            https://github.com/yast/yast-rear
+
+Source0:        %{name}-%{version}.tar.bz2
+
+BuildRequires:  docbook-xsl-stylesheets
+BuildRequires:  doxygen
+BuildRequires:  libxslt
+BuildRequires:  perl-XML-Writer
+BuildRequires:  sgml-skel
+BuildRequires:  update-desktop-files
+BuildRequires:  yast2 yast2-testsuite
+BuildRequires:  yast2-storage-ng
+BuildRequires:  yast2-devtools >= 4.2.2
+
+Requires:       yast2
 Requires:       rear >= 1.10.0
 Requires:       yast2-storage-ng
-
-BuildArchitectures:	noarch
-
 Requires:       yast2-ruby-bindings >= 1.0.0
 
-Summary:	YaST2 - Rear - Relax and Recover
+BuildArch:      noarch
 
 %description
 The YaST2 component for configuring Rear - Relax and Recover Backup
 
-
 %prep
-%setup -n %{name}-%{version}
+%setup -q
 
 %build
 %yast_build
 
 %install
 %yast_install
-
+%yast_metainfo
 
 %files
-%defattr(-,root,root)
-%dir %{yast_yncludedir}/rear
-%{yast_yncludedir}/rear/*
-%{yast_clientdir}/rear.rb
-%{yast_moduledir}/RearSystemCheck.*
-%{yast_moduledir}/Rear.*
-%dir %{yast_libdir}/rear
-%{yast_libdir}/rear/*.rb
-%{yast_desktopdir}/rear.desktop
-%{yast_scrconfdir}/*.scr
+%{yast_yncludedir}
+%{yast_clientdir}
+%{yast_moduledir}
+%{yast_libdir}
+%{yast_desktopdir}
+%{yast_metainfodir}
+%{yast_scrconfdir}
 %{yast_icondir}
 %doc %{yast_docdir}
 %license COPYING
