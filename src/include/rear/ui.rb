@@ -374,7 +374,7 @@ module Yast
           VBox(
             HSpacing(80),
             VSpacing(0.5),
-            LogView(Id(:log), "Rear output:", 8, 0),
+            LogView(Id(:log), _("Rear output:"), 8, 0),
             VSpacing(0.5),
             ReplacePoint(Id(:rp), Label(_("Preparing for Rear Execution."))),
             VSpacing(0.5),
