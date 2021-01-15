@@ -91,6 +91,14 @@ module Yast
       storage = Storage.GetTargetMap
       supportedfs = [:ext2, :ext3, :ext4, :tmpfs, :swap, :none, :nfs, :nfs4]
       unsupported = []
+      # Check rear version
+      rear_cmd_ver = "/usr/sbin/rear -V | cut -d' ' -f2";
+      out = SCR.Execute(path(".target.bash_output"), rear_cmd_ver);
+
+      # version >=1.18 supports  vfat partitions
+      if Gem::Version.new(Ops.get_string(out, "stdout", "")) >= Gem::Version.new("1.18")
+        supportedfs.push(:vfat);
+      end
 
       Builtins.foreach(storage) do |device, devicemap|
         # check devices
