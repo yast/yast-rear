@@ -93,6 +93,14 @@ module Yast
       devicegraph = Y2Storage::StorageManager.instance.probed
       supportedfs = [:ext2, :ext3, :ext4, :tmpfs, :swap, :none, :nfs, :nfs4, :btrfs, :xfs]
       unsupported = []
+      # Check rear version
+      rear_cmd_ver = "/usr/sbin/rear -V | cut -d' ' -f2";
+      out = SCR.Execute(path(".target.bash_output"), rear_cmd_ver);
+
+      # version >=1.18 supports  vfat partitions
+      if Gem::Version.new(Ops.get_string(out, "stdout", "")) >= Gem::Version.new("1.18")
+        supportedfs.push(:vfat);
+      end
 
       devicegraph.disk_devices.each do |device|
         # check devices
