@@ -30,6 +30,7 @@
 # Input and output routines.
 require "yast"
 require "y2storage"
+require "shellwords"
 
 module Yast
   class RearClass < Module
@@ -72,57 +73,75 @@ module Yast
       deep_copy(usbparts)
     end
 
-
+    # The module distinguishes between two types of lists that are used in the ReaR configuration.
+    # They are called by this code as basic and quoted lists.
+    # * A basic list consists of as-is names. Elements of this list are not transformed in any way
+    #   when being written to or read from the configuration file, with the exception of escaping
+    #   spaces.
+    # * A quoted list consists of names that should be protected from shell processing. Elements of
+    #   such a list are quoted when writing them in the configuration file and unquoted/unescaped
+    #   when reading them. This is used to store scripts that are invoked by ReaR using
+    #   'eval "${CONFIG_VAR[@]}"' and for wildcard names that should not be expanded by the shell
+    #   directly.
 
     # Convert List from Config File to YCP List
     def RearListToYCPList(rearlist)
-      ycplist = []
-      ycplisttmp = []
-
       return [] if rearlist == nil
 
-      # remove brakets
+      # remove parentheses
       rearlist = Builtins.regexpsub(Convert.to_string(rearlist), "^ *\\((.*)\\) *$", "\\1")
 
-      # split string seperated by spaces into a string list, respect backslash escaped blanks
-      ycplisttmp = Builtins.splitstring(rearlist, " ")
+      # split string separated by spaces into a string list, respect backslash escaped blanks
+      ycplisttmp = rearlist.split(" ")
+      ycplist = []
       buffer = ""
-      Builtins.foreach(ycplisttmp) do |elem|
-        length = Builtins.size(elem)
-        if Builtins.substring(elem, Ops.subtract(length, 1), 1) == "\\"
-          buffer = Ops.add(
-            Ops.add(
-              buffer,
-              Builtins.substring(elem, 0, Ops.subtract(length, 1))
-            ),
-            " "
-          )
+      ycplisttmp.each do |elem|
+        if elem[-1] == "\\"
+          buffer += elem[0...-1] + " "
         else
-          buffer = Ops.add(buffer, elem)
-          ycplist = Builtins.add(ycplist, buffer)
+          buffer += elem
+          ycplist.push(buffer)
           buffer = ""
         end
       end
 
       # remove empty elements
-      ycplist = Builtins.filter(ycplist) { |element| element != "" }
+      ycplist = ycplist.select { |elem| elem != "" }
 
       deep_copy(ycplist)
     end
 
-
     # Convert YCP List to Format for Config File
     def YCPListToRearList(ycplist)
-      ycplist = deep_copy(ycplist)
-      escaped = []
       # escape blanks in directories with a backslash
-      Builtins.foreach(ycplist) do |elem|
-        escaped = Builtins.add(
-          escaped,
-          Builtins.mergestring(Builtins.splitstring(elem, " "), "\\ ")
-        )
-      end
-      Ops.add(Ops.add("(", Builtins.mergestring(escaped, " ")), ")")
+      escaped = ycplist.map { |elem| elem.gsub(" ", "\\ ") }
+
+      "(" + escaped.join(" ") + ")"
+    end
+
+    # Convert Quoted List from Config File to YCP List
+    def RearQuotedListToYCPList(rearlist)
+      return [] if rearlist == nil
+
+      # remove parentheses
+      rearlist = Builtins.regexpsub(Convert.to_string(rearlist), "^ *\\((.*)\\) *$", "\\1")
+
+      # split string separated by spaces into a string list, respect shell quoting
+      ycplist = Shellwords.split(rearlist);
+
+      # remove empty elements
+      ycplist = ycplist.select { |elem| elem != "" }
+
+      deep_copy(ycplist)
+    end
+
+    # Convert YCP List to Quoted Format for Config File
+    def YCPListToRearQuotedList(ycplist)
+      # escape all commands by putting them in single quotes, instead of using Shellwords.escape
+      # which would escape each individual character thus making the result harder to read
+      escaped = ycplist.map { |elem| "'" + String.Quote(elem) + "'" }
+
+      "(" + escaped.join(" ") + ")"
     end
 
     # Read rear settings from /etc/rear/local.conf
@@ -160,11 +179,11 @@ module Yast
 
         backup_prog_include_tmp =
           SCR.Read(path(".etc.rear_conf.v.BACKUP_PROG_INCLUDE"))
-        @backup_prog_include = RearListToYCPList(backup_prog_include_tmp)
+        @backup_prog_include = RearQuotedListToYCPList(backup_prog_include_tmp)
 
         post_recovery_script_tmp = 
           SCR.Read(path(".etc.rear_conf.v.POST_RECOVERY_SCRIPT"))
-        @post_recovery_script = RearListToYCPList(post_recovery_script_tmp)
+        @post_recovery_script = RearQuotedListToYCPList(post_recovery_script_tmp)
 
         # These two configuration parameters extend a rear system variable.
         # It is bash, so this is done by including the old value of that variable
@@ -213,14 +232,14 @@ module Yast
       unless @backup_prog_include.empty?
         SCR.Write(
           path(".etc.rear_conf.v.BACKUP_PROG_INCLUDE"),
-          YCPListToRearList(@backup_prog_include)
+          YCPListToRearQuotedList(@backup_prog_include)
         )
       end
 
       unless @post_recovery_script.empty?
         SCR.Write(
           path(".etc.rear_conf.v.POST_RECOVERY_SCRIPT"),
-          YCPListToRearList(@post_recovery_script)
+          YCPListToRearQuotedList(@post_recovery_script)
         )
       end
 
