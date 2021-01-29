@@ -35,6 +35,7 @@ BuildRequires:  update-desktop-files
 BuildRequires:  yast2 yast2-testsuite
 BuildRequires:  yast2-storage-ng
 BuildRequires:  yast2-devtools >= 4.2.2
+BuildRequires:  rubygem(%rb_default_ruby_abi:rspec)
 
 Requires:       yast2
 Requires:       rear >= 1.10.0
