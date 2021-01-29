@@ -50,6 +50,22 @@ module Yast
       'fi'
     ]
 
+    # List of scripts that the module should offer to remove from POST_RECOVERY_SCRIPT.
+    #
+    # This is used to fix up a problem with older versions of yast-rear which output an incorrectly
+    # escaped snapper quota snippet when writing it into the ReaR configuration file. The problem
+    # appeared in the following versions: 3.2.0 (2017) .. 4.2.2 (2021). This logic can be removed at
+    # some reasonable point in the future when it is expected all configuration files have been
+    # likely already corrected.
+    POST_RECOVERY_SCRIPT_REMOVE = [
+      'if snapper --no-dbus -r $TARGET_FS_ROOT get-config | grep -q ^QGROUP.*[0-9]/[0-9] ; '\
+      'then snapper --no-dbus -r $TARGET_FS_ROOT set-config QGROUP= ;'\
+      ' snapper --no-dbus -r $TARGET_FS_ROOT setup-quota && echo snapper setup-quota done'\
+      ' || echo snapper setup-quota failed ; '\
+      'else echo snapper setup-quota not used ; '\
+      'fi'
+    ]
+
     def initialize_rear_ui(include_target)
       Yast.import "UI"
 
@@ -103,16 +119,29 @@ module Yast
       mountpoints.map {|e| e + "/*" }
     end
 
-    # helper to compare an array with a default array and returns a formatted
-    # list containing the items that need to be added to the array to become
-    # equal to the default array.
-    def ArrayChecker(value, default)
-      to_add = default - value
+    # Helper to compare two arrays
+    #
+    # Compare the value array with the default array. The action selects whether the default array
+    # defines entries that are expected in the value array and should be added if missing (:add), or
+    # are not desired and should be removed if present (:remove).
+    #
+    # @param value [Array<String>] current entries
+    # @param default [Array<String>] entries that should appear (:add) or are not desired (:remove)
+    #   in the value array
+    # @param action [Symbol] operation mode (:add, :remove)
+    # @return [String] list describing which entries need adding (:add) or removing (:remove)
+    def ArrayChecker(value, default, action)
+      if action == :add
+        diff = default - value
+      else
+        raise ArgumentError, "action must be :add or :remove" if action != :remove
+        diff = default & value
+      end
 
-      unless to_add.empty?
+      unless diff.empty?
         message =
           "<ul><li>" +
-          to_add.join("</li><li>") +
+          diff.join("</li><li>") +
           "</li></ul>"
       end
 
@@ -508,17 +537,20 @@ module Yast
       backup_options = BACKUP_OPTIONS if backup_options.empty?
 
       if RearSystemCheck.Btrfs?
-        msg = ArrayChecker(backup_prog_include, mountpoints)
+        msg = ArrayChecker(backup_prog_include, mountpoints, :add)
         message += _("Additional directories in the backup:") + msg if msg
       end
 
-      msg = ArrayChecker(required_progs, REQUIRED_PROGS)
+      msg = ArrayChecker(required_progs, REQUIRED_PROGS, :add)
       message += _("Additional programs in the rescue system:") + msg if msg
 
-      msg = ArrayChecker(copy_as_is, COPY_AS_IS)
+      msg = ArrayChecker(copy_as_is, COPY_AS_IS, :add)
       message += _("Additional files to be copied into the rescue system:") + msg if msg
 
-      msg = ArrayChecker(post_recovery_script, POST_RECOVERY_SCRIPT)
+      msg = ArrayChecker(post_recovery_script, POST_RECOVERY_SCRIPT_REMOVE, :remove)
+      message += _("Removal of malformed post recovery scripts:") + msg if msg
+
+      msg = ArrayChecker(post_recovery_script, POST_RECOVERY_SCRIPT, :add)
       message += _("Additional post recovery scripts:") + msg if msg
 
       unless message.empty?
@@ -534,6 +566,7 @@ module Yast
           backup_prog_include |= mountpoints
           required_progs |= REQUIRED_PROGS
           copy_as_is |= COPY_AS_IS
+          post_recovery_script -= POST_RECOVERY_SCRIPT_REMOVE
           post_recovery_script |= POST_RECOVERY_SCRIPT
         else
           Builtins.y2warning("User did not accept the config changes we suggested.")
