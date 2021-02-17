@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Tue Jan 19 11:23:26 UTC 2021 - aabdallah@suse.com
+
+- Don't show a warning anymore for vfat partitions, as versions
+  1.18 and higher of rear support them (bsc#1180599)
+- 3.2.2
+
+-------------------------------------------------------------------
 Tue Aug  1 13:23:03 UTC 2017 - lslezak@suse.cz
 
 - Added missing files to the RPM package, the recently added
