@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Tue Jan 19 11:23:26 UTC 2021 - aabdallah@suse.com
+
+- Don't show a warning anymore for vfat partitions, as versions
+  1.18 and higher of rear support them (bsc#1180599)
+- 4.1.1
+
+-------------------------------------------------------------------
 Tue Dec 18 16:18:02 UTC 2018 - jreidinger@suse.com
 
 - always use absolute path to binaries (bsc#1118291)
