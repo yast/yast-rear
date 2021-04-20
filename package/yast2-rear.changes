@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Apr 20 13:51:55 UTC 2021 - Ladislav Slezák <lslezak@suse.cz>
+
+- 4.4.0
+
+-------------------------------------------------------------------
 Sat Jan 23 20:14:50 UTC 2021 - Petr Pavlu <petr.pavlu@suse.com>
 
 - Fix quoting of values in POST_RECOVERY_SCRIPT and
