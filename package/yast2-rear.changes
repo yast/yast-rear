@@ -1,7 +1,7 @@
 -------------------------------------------------------------------
 Tue Sep  7 13:46:49 UTC 2021 - David Diaz <dgonzalez@suse.com>
 
-- Build package only for supported architectures (bsc#1189646).
+- Build the package only for supported architectures (bsc#1189646).
 - 4.4.2
 
 -------------------------------------------------------------------
