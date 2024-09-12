@@ -1,7 +1,7 @@
 #
 # spec file for package yast2-rear
 #
-# Copyright (c) 2021 SUSE LLC
+# Copyright (c) 2023 SUSE LLC
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -42,7 +42,7 @@ Requires:       yast2-storage-ng
 
 # Build the package only for architectures supported by rear (bsc#1189646)
 # See https://github.com/rear/rear/blob/f06e0d22eeb3bd45ad8ce0b8fce0b538e4534f93/packaging/rpm/rear.spec#L27-L33
-ExclusiveArch: %ix86 x86_64 ppc ppc64 ppc64le ia64
+ExclusiveArch:  %ix86 x86_64 ppc ppc64 ppc64le ia64
 
 %description
 The YaST2 component for configuring Rear - Relax and Recover Backup
