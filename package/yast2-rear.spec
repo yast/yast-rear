@@ -17,7 +17,7 @@
 
 
 Name:           yast2-rear
-Version:        4.6.0
+Version:        4.7.0
 Release:        0
 Summary:        YaST2 - Rear - Relax and Recover
 License:        GPL-2.0-only
